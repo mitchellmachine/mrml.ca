@@ -167,8 +167,7 @@ dynamic-component/interface delta to those architectures.
 
 **PARTIALLY IMPLEMENTED transport prerequisite:** the canonical Zstd ABI-3
 provider and ZIM requirement now declare `isolated-service`; the provider
-manifest permits native-service or microVM placement with a native-service
-floor. A service-side adapter composes the unchanged 104-byte ABI request with
+manifest requires microVM placement. A service-side adapter composes the unchanged 104-byte ABI request with
 the kernel's existing authenticated inline IPC and exactly one attenuated
 read/write shared-buffer capability. It copies only the declared input into
 private scratch, writes only the exact successful output, and erases scratch on
@@ -769,9 +768,27 @@ path names. Invalid state, identity substitution, stale authority, replay,
 oversized payload, undersized output, and sequence exhaustion fail before
 publication. Request and response publication now each produce a non-forgeable
 typed notification carrying the exact binding identity, operation, and sequence;
-the opposite endpoint must present it before consuming payload bytes. Nested KVM
-transports that bounded ZIM-like request and Zstd-like response across two live
-VM mappings. Release fences precede request, response, and idle publication;
+the opposite endpoint must present it before consuming payload bytes. The hosted peer-page test now transports an exact canonical block-provider READ
+and its 512-byte result across two live VM mappings. The shared wire holds only
+the existing request, canonical status, and exact-length data on success. The
+adapter rejects stale sessions before backend dispatch and requires exact
+response length before publishing bytes to the caller. The retirement simulation
+checks that stale request and completion notifications do not reach the
+replacement provider or change the caller's buffer. The focused signed guest
+payloads now generate and check the sector through their own page tables.
+Nested KVM reached both guest payloads and verified native mapping retirement.
+On the local WHP host, the second partition object and setup succeeded but
+its first `WHvMapGpaRange` returned `0xC0370008` (`ERROR_VID_PARTITION_ALREADY_EXISTS`).
+The diagnostic now runs the provider in a separate test process while the
+consumer partition remains live. Both map one pagefile-backed Windows section
+at independent GPAs. The parent observes the worker guest's sector writes
+through its existing mapping without a file-copy handoff. The signed consumer
+checks all 512 bytes, and both processes verify that their exact virtual and
+GPA mappings are absent after retirement. This verifies the diagnostic, not a
+production worker transport or a same-process fix. The host coordinates the canonical queue
+and its interrupt routing separately; the guest payloads do not consume
+injected interrupts. This reuses the
+existing slot and adds no mapping or service authority. Release fences precede request, response, and idle publication;
 matching acquire fences follow state observation before consuming metadata or
 payload. Backend interrupt/event delivery, a race-tested atomic shared-state
 representation, signed component execution, and recovery integration remain

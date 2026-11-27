@@ -1,8 +1,14 @@
 # ACME certificate service
 
-**Status: PARTIALLY IMPLEMENTED.** The shared bounded semantic foundation exists;
-the deployed certificate lifecycle service does not. MRML must not yet be used
-to obtain or deploy a public certificate.
+**Status: PARTIALLY IMPLEMENTED.** The bounded ACME library, hosted Linux
+certificate daemon and ACME worker, and offline Compose deployment tooling
+exist. Real certd enrollment with a disposable local CA and combined Gitd/certd
+operation were exercised in controlled environments. Neither proves public-CA
+issuance with owner production credentials or authorizes public activation.
+See the [deployment guide](../deploy/compose/README.md), [local enrollment
+record](gitd/operations/CERTD_REAL_ENROLLMENT_2026-09-05.md), and [combined Docker
+record](gitd/operations/FINAL_COMPLETION_2026-09-05.md). Earlier measurements
+below retain their original scope.
 
 The initial `org.mrml.library.acme` package is one logical package with MRML,
 Windows, and Linux targets. It currently provides allocation-free bounded types
@@ -507,15 +513,14 @@ owner policy. Response order never selects trust compatibility.
 Future platform adapters belong inside these logical packages and must not fork
 their public semantics.
 
-Repository CI now configures the canonical manifest, lock, audit, assurance,
-clippy, full Linux release, native-Windows release, pinned
-Windows-GNU/LLVM-under-Wine certificate, deterministic interface-regeneration,
-CUDA compile-only, and Linux AddressSanitizer gates. The focused ACME,
-certificate-service, and security-fuzz packages run explicitly in the hosted
-lanes so their results remain visible even when an unrelated full-repository
-gate fails. Workflow configuration is not execution evidence: a green runner
-result may be recorded only after that exact environment completes, and Wine
-continues to be labelled `WINDOWS_GNULLVM_UNDER_WINE`, never native Windows.
+At the time of the focused evidence below, repository CI configured manifest,
+lock, audit, assurance, Clippy, native Linux and Windows release suites,
+Windows-GNU/LLVM-under-Wine certificate tests, interface regeneration, CUDA
+compile-only checks, and Linux AddressSanitizer. Focused ACME, certificate,
+and security-fuzz packages ran in separate hosted lanes so an unrelated failure
+did not hide their results. No such workflow is tracked in the current checkout;
+see [Project status](PROJECT_STATUS.md). Cite a runner result only for the
+revision and environment it exercised. Wine is not native Windows evidence.
 
 Exact focused final-tree evidence at commit `2040869f` is:
 
@@ -535,8 +540,8 @@ Exact focused final-tree evidence at commit `2040869f` is:
   with exact identity IPC and authenticated in-service durable-record recovery.
 
 `cargo build --locked`, warnings-denied Cargo clippy, manifest check, and lock
-check pass. Repository assurance remains blocked before its workflow check by
-the pre-existing unadmitted compiler thread-local-storage probe
+check passed in that evidence. Repository assurance was blocked before its
+workflow check by the then-unadmitted compiler thread-local-storage probe
 `docs/compiler/probes/pinned_std_thread_tls_execution.rs`; “TLS” in that probe
 means compiler thread-local storage, not this certificate/TLS feature, so this
 task does not admit it. The attempted full Linux release gate likewise did not

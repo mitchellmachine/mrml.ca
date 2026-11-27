@@ -1,12 +1,17 @@
 # Linux deployment adapter
 
-Status: **PARTIALLY IMPLEMENTED**. The image-only Compose fragment, safe host
-provisioner, separate minimal images, offline release recipe, cold backup and
-restore, and immutable image upgrade/rollback operators exist. `mrml-gitd`
-composes authenticated repository recovery, authority and certificate channels,
-one TLS-generation store, bounded HTTP/2 workers, and the sole QUIC UDP reactor
-before reporting application readiness. The host publishes only TCP and UDP 443
-to Gitd's unprivileged internal port.
+Status: **PARTIALLY IMPLEMENTED** as a deployment platform. The image-only base
+[Git Compose profile](../../../deploy/compose/compose.git.yaml) publishes TCP
+443 to Gitd's internal port 8443. Bounded TLS 1.3/HTTP/2, offline image loading,
+protected Git operations, cold backup and fresh-target restore were exercised
+by the [dated hardened Docker run](../operations/FINAL_COMPLETION_2026-09-05.md).
+HTTP/3/UDP is not published in that base profile; QUIC source and separate
+hosted listener probes do not change that. Public activation is unverified.
+See the [current checkpoint](../operations/CURRENT_COMPLETION.md) for status.
+
+## Adapter mechanisms and development evidence
+
+The earlier package and host tests below retain their recorded evidence scope.
 
 A bounded filesystem-backed persistent cache adapter is implemented with
 file-and-directory durability barriers and quota pruning. Its root is supplied
@@ -23,10 +28,9 @@ do not embed configuration, repository data, trust/proof state, receipt keys,
 certd material, ACME credentials, or build tools. The static
 `deploy/compose/test-git-images.sh` gate verifies pinned stages, intended users
 and entrypoints, and rejects representative cross-service secret/binary
-references. It passed under hosted Linux. No image build or runtime execution
-was performed in this evidence because Docker is unavailable on the current
-host. The daemon and Compose service exist, but source-level evidence is not
-container, public-network, physical-host, or real-certificate evidence.
+references. It passed under hosted Linux. That static gate did not exercise containers. For actual image loading and
+runtime evidence, consult the [dated hardened Docker run](../operations/FINAL_COMPLETION_2026-09-05.md).
+Public-network and physical-host support are not inferred from it.
 
 `GitdBoundListeners` now provides atomic process ownership of TCP and UDP on one
 exact configured IPv4 port. It validates the QUIC endpoint's 65,536-connection
@@ -41,8 +45,8 @@ daemon blocks SIGINT/SIGTERM before worker creation, consumes them in one
 synchronous waiter, wakes both listeners, stops admission, marks readiness
 draining, stops certificate rotation, and joins the HTTP/2 and HTTP/3 worker
 pools. Connection I/O deadlines use the configured bounded drain interval.
-This path compiled and passed package tests, but a real-process signal test in
-the production containers has not run on the current host. Gitd's native Compose health command
+These listener and drain mechanisms passed package tests. The separate dated
+Docker record also reports container stops and recreation. Gitd's native Compose health command
 performs a fresh loopback TLS 1.3 handshake, authenticates the configured
 server name through the project trust policy, and requires negotiated HTTP/2;
 it loads no private key and does not use curl or a shell. The authority health
@@ -64,9 +68,10 @@ passes the exact `MRML_PROTECTED_REPOSITORY` separately. The authority validates
 that canonical identity and derives its path beneath the fixed root; Gitd opens
 the same policy through its catalog-derived path. Authority-owned detached proofs
 remain under the matching repository identity in authority state. This release
-profile deliberately serves one explicitly selected protected repository per
-authority process; the name selects state but grants no authority, and startup
-fails if the selected policy, generation, keys, or catalog state disagree.
+profile binds selected repository identities to exact state; a name selects state
+but grants no authority. Startup fails on policy, generation, key or catalog
+mismatch. The later catalog and Docker acceptance include two protected
+repositories under a shared authority generation store.
 
 Before UDP admission, the endpoint receives a distinct generated retry key and
 nonzero generation. Gitd configures a 30-second one-use retry-token manager,
@@ -76,16 +81,14 @@ nonsymlink regular file with private owner-only mode. Hosted tests prove the
 valid file and reject group-readable mode. Retry state does not grant repository
 or application authority.
 
-`build-offline-git-bundle.sh` is the offline release recipe for those two
-images. It requires a canonical version and new absolute output, exact local
-Cosign key files, clean manifest checks, focused authority/Gitd tests, release
-builds, network-disabled/no-pull image builds, image identity records, SPDX JSON
-SBOMs, offline blob-signature bundles, and a deterministic tar containing the
-provisioner and Gitd configuration template. The matching verifier checks every
-recorded SHA-256 checksum, requires each identity/SBOM artifact, and verifies
-both image archives with the bundled public key. Hosted shell evidence covers
-syntax and early invalid-version/output refusal only; Docker, Syft, Cosign, and
-the complete offline recipe have not yet run in this environment.
+[The offline bundle builder](../../../deploy/compose/build-offline-git-bundle.sh)
+accepts profile `v5` (five Git-related images) or `v6` (adds certd and the Git
+client). It requires exact local Cosign key files, a clean source tree, focused
+checks, SBOMs, exact image identities and offline signatures. The separately
+provisioned verifier must anchor trust in an independently selected public key,
+not in a key trusted simply because it arrived in the bundle. The dated `v6`
+acceptance verified and loaded seven exact images. See
+[offline trust provisioning](../operations/OFFLINE_TRUST_ROOT.md).
 
 Release construction also requires `GIT_STREAMING_EVIDENCE` from the exact
 source commit. The evidence must be produced by the bounded 256 MiB-or-larger
@@ -94,16 +97,15 @@ process samples and a peak/growth summary. Both the builder and offline verifier
 enforce this gate, so an unmeasured image cannot be represented as the complete
 Git release artifact.
 
-`backup-git.sh` accepts only a stopped stack and captures authoritative Gitd,
-authority, policy, receipt, journal, verifier, and secret state while excluding
-the disposable cache. Restore accepts only a new empty deployment root, rejects
-links and special files, checks the detached digest, preserves numeric
-ownership, and reruns provisioning invariants without activating services. The
-immutable version switcher requires both preloaded image tags, uses `--no-build
---pull never`, waits for Gitd and the authority to report healthy, and records
-the activated version atomically. Rollback changes images only; it never
-silently rolls repository data or security generations backward. Root/Docker
-execution of these workflows remains unperformed in the current evidence.
+[Cold backup](../../../deploy/compose/backup-git.sh) requires stopped Gitd and
+authority volumes and creates and verifies an authenticated encrypted backup
+generation. [Restore](../../../deploy/compose/restore-git.sh) requires an unused
+`mrml-git-restore-*` namespace, checks the backup generation, and restores into
+new named volumes without enabling services. A failed restore leaves the new
+namespace invalid; complete recovery and validation before explicit activation.
+The dated Docker run exercised restore without the source volumes. The image
+switcher uses preloaded image tags and records the version only after health
+checks. Image rollback does not rewind repository data or security generations.
 
 Repository creation is an explicit stopped-service administration operation.
 `initialize-git-repository.sh owner/repository` runs a one-shot Gitd container,

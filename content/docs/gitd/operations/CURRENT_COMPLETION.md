@@ -1,14 +1,21 @@
-# Git/Gitd completion checkpoint — 2026-09-05
+# Git/Gitd completion checkpoint
 
-A–F implementation and actual hardened Docker acceptance are **TESTED**.
-The final clean-source lineage passed all thirteen acceptance steps, including
-real certd outage during established work, destructive restore and recreation.
-See [final completion](FINAL_COMPLETION_2026-09-05.md) for source identity, changed
-files, exact commands, results and limitations. Signed Git checkpoint remains
-**BLOCKED_EXTERNAL_INPUT** pending local GPG unlock; next action is to unlock
-the existing owner key and sign the intended checkpoint. Public activation is
-not approved. Earlier entries below are historical and do not supersede the
-final record.
+The protected SHA-256 Git stack is **IMPLEMENTED** for the bounded hosted
+TLS 1.3/HTTP/2 profile. The 2026-09-05 clean-source hardened Docker run passed
+all thirteen recorded steps, including a real certd outage during established
+work, destructive restore into fresh volumes, and recreation. The base Compose
+profile leaves HTTP/3 disabled. See the [final dated record](FINAL_COMPLETION_2026-09-05.md)
+for its source digest, exact commands, results, and limits, and the
+[Linux deployment guide](../edge/LINUX_DEPLOYMENT.md) for the current profile.
+
+MRML source now lives on GitHub with [Ed25519 SSH-signed history](../../human/VERIFY_COMMITS.md).
+The historical GPG timeout below describes the dated test checkpoint. It is not
+an outstanding GitHub signing step, and the GitHub signatures do not replace
+Gitd's protected SHA-256 receipt/signing policy or the offline bundle trust root.
+The historical source archive digest is not a Git commit ID. Public activation
+is not established by these tests.
+
+## Historical checkpoint log (2026-09-05)
 
 ## Source and preservation
 

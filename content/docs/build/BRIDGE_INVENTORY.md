@@ -2,8 +2,8 @@
 
 > **Historical migration ledger.** Counts and host results below describe the
 > dated migration steps recorded at the time. They are intentionally frozen and
-> are not current workspace totals. See the generated
-> [workspace status](../STATUS.md) for current machine-readable facts.
+> are not current workspace totals. See [Project status](../PROJECT_STATUS.md)
+> for live workspace commands.
 
 **Recorded status on 2026-08-25: IMPLEMENTED NATIVE GRAPH / CLEAN-SOURCE
 BOOTSTRAP ONLY.** The

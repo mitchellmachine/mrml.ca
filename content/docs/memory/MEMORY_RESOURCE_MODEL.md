@@ -182,7 +182,16 @@ suites pass 574 tests. Native one-page backing and exact GPA map/unmap are now
 both mappings are removed and leaks rather than frees it if unmapping is
 uncertain. Nested KVM exercised two distinct live VMs and observed the same
 bytes. This nested WHP host rejects a second simultaneous partition with a typed
-VID collision, so WHP has API/source parity but no two-partition execution claim.
+VID collision when registering the second partition's first GPA range. The
+separate-process WHP storage diagnostic now verifies two signed guests with
+one pagefile-backed section, exact removal of both mappings, and a 512-byte
+RAM-backed result. The parent and worker open separate views of the same
+section; no payload is written to a scratch file. Both workers use the same
+local alias owner, which checks the exact peer projection before mapping,
+withdraws its virtual leaf before unregistering GPA backing, and keeps the
+backing alive if retirement cannot be confirmed. Naming and opening the test
+section is not part of that owner. WHP same-process shared backing and a
+production worker transport remain unverified on this host.
 Guest page-table projection, peer queues, and execution remain **PLANNED**.
 
 Exact guest translation is now **PARTIALLY IMPLEMENTED** by the same retained
@@ -230,14 +239,13 @@ deduplication is disabled by default pending side-channel analysis.
 
 ## Placement and performance
 
-Adaptive execution placement is specified in
+Strict Total MicroVM placement is specified in
 [../ISOLATION_PLACEMENT.md](../ISOLATION_PLACEMENT.md). Requested and effective
 placement carry explicit process/service/VM, page-table, queue, and shared-code
 charges. In strict Total mode, RAM, vCPU, VirtualGPU, VirtIO, projection, or VMM
 resource exhaustion makes the affected eligible component unavailable and
 reports the exact shortage; it never causes native fallback. Resource pressure
 may reduce availability, throttle, or stop work, but cannot weaken placement.
-Balanced may use a visible policy-permitted alternative within mandatory floors.
 
 The adaptive-isolation path now has a **PARTIALLY IMPLEMENTED** linear
 `MicrovmProjectionPlan`. Before backend allocation begins it revalidates the

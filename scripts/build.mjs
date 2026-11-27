@@ -3,8 +3,10 @@ import { posix as path } from 'node:path';
 import markdownit from '../vendor/markdown-it.cjs';
 
 const repository = 'https://github.com/mitchellmachine/mrml';
-const source = repository + '/blob/HEAD/';
 const { revision, paths } = JSON.parse(readFileSync('content/snapshot.json', 'utf8'));
+if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('Invalid MRML source revision');
+const source = `${repository}/blob/${revision}/`;
+const documentationSource = `${repository}/tree/${revision}/docs`;
 const md = markdownit({ html: false });
 const documents = new Map();
 const pages = new Map();
@@ -56,8 +58,8 @@ const link = (from, file, title) => {
   return `<a href="${url(from, target.output)}">${escape(title ?? target.title)}</a>`;
 };
 const groups = [
-  ['Start here', 'docs/human/OVERVIEW.md', 'docs/human/GETTING_STARTED.md', 'docs/human/CONTRIBUTING.md', 'VALUES.md', 'docs/STATUS.md', 'docs/ROADMAP.md'],
-  ['System architecture', 'docs/ARCHITECTURE.md', 'docs/MICROKERNEL.md', 'docs/APPLICATION_PLATFORM.md', 'docs/SECURITY.md', 'docs/RECOVERY.md'],
+  ['Start here', 'docs/human/OVERVIEW.md', 'docs/human/GETTING_STARTED.md', 'docs/human/CONTRIBUTING.md', 'VALUES.md', 'docs/PROJECT_STATUS.md', 'docs/ROADMAP.md'],
+  ['System architecture', 'docs/ARCHITECTURE.md', 'docs/GIGAKERNEL.md', 'docs/APPLICATION_PLATFORM.md', 'docs/SECURITY.md', 'docs/RECOVERY.md'],
   ['Accessibility and interaction', 'docs/ACCESSIBILITY.md', 'docs/accessibility/BRAILLE_INTERFACE.md', 'docs/accessibility/MONITOR_OFF_ACCEPTANCE.md', 'docs/BROWSER_SEMANTICS.md'],
   ['Compiler and build tools', 'docs/COMPILER.md', 'docs/compiler/LINKER.md', 'docs/build/BUILD_SYSTEM.md', 'docs/DEPLOYMENT.md'],
 ];
@@ -94,7 +96,7 @@ function page(output, title, area, body, description = 'MRML project documentati
 <nav aria-label="Primary">${nav('docs.html', 'Documentation')}${nav('project.html', 'Project')}<a href="${repository}/releases">Releases</a><a href="${repository}">Source code</a></nav>
 </div></header>
 <main class="wrap" id="main" tabindex="-1">${body}</main>
-<footer class="site-footer"><div class="wrap footer-row"><span>MRML · Experimental systems research</span><a href="${local('project.html')}">About this documentation</a></div></footer>
+<footer class="site-footer"><div class="wrap footer-row"><span>MRML · Experimental systems research</span><span>This website was generated from the <a href="${documentationSource}">MRML docs on GitHub</a>.</span><a href="${local('project.html')}">About this documentation</a></div></footer>
 </body>
 </html>`);
 }
@@ -105,15 +107,15 @@ page(home, 'Systems research in Rust', home, `
 <div>
 <p class="kicker">Experimental systems research</p>
 <h1>Systems research<br>in <em>Rust.</em></h1>
-<p class="intro">MRML explores operating systems, virtualization, compilers, and local AI with owner control and accessibility built into the architecture.</p>
+<p class="intro">MRML is a Rust research project spanning operating systems, compilers, and local machine learning. Its Gigakernel is being built around strict Total MicroVM isolation, with no native fallback inside MRML OS.</p>
 <div class="actions"><a class="button" href="docs.html">Explore documentation</a><a class="button secondary" href="${repository}/releases">View releases</a></div>
 </div>
 <div class="stack">
 <p class="kicker">Architecture reading guide</p>
 <div class="stack-row"><span>Interaction</span>${link(home, 'docs/ACCESSIBILITY.md', 'Accessible interfaces')}</div>
 <div class="stack-row"><span>Application layer</span>${link(home, 'docs/APPLICATION_PLATFORM.md', 'Application platform')}</div>
-<div class="stack-row"><span>Isolation</span>${link(home, 'docs/PARAVIRTUAL_DEVICES.md', 'Paravirtual devices')}</div>
-<div class="stack-row"><span>Mechanisms</span>${link(home, 'docs/MICROKERNEL.md', 'Microkernel')}</div>
+<div class="stack-row"><span>Isolation</span>${link(home, 'docs/ISOLATION_PLACEMENT.md', 'Total MicroVM isolation')}</div>
+<div class="stack-row"><span>Mechanisms</span>${link(home, 'docs/GIGAKERNEL.md', 'Gigakernel')}</div>
 </div>
 </section>
 <section class="section">
@@ -122,9 +124,10 @@ page(home, 'Systems research in Rust', home, `
 <div class="feature-grid">
 <article><h3>${link(home, 'docs/ARCHITECTURE.md', 'Architecture')}</h3><p>Trace the boundaries between the kernel, isolated services, virtualization, and applications.</p></article>
 <article><h3>${link(home, 'docs/COMPILER.md', 'Compiler and tooling')}</h3><p>Follow the Rust compiler effort, its conformance gates, and the native build tooling.</p></article>
-<article><h3>${link(home, 'docs/STATUS.md', 'Workspace status')}</h3><p>Check the recorded project state and use the ${link(home, 'docs/ROADMAP.md', 'roadmap')} to follow work in dependency order.</p></article>
+<article><h3>${link(home, 'docs/PROJECT_STATUS.md', 'Project status')}</h3><p>See what has been verified, then use the ${link(home, 'docs/ROADMAP.md', 'roadmap')} to follow work in dependency order.</p></article>
 </div>
 </section>
+<section class="section"><h2>Host software and platform plans</h2><p class="intro">MRML build tools, compiler, local ML, media libraries, and Git tools can run directly on Windows or Linux. x86-64 is the primary OS bring-up target; macOS and ARM64 support are planned.</p><p>${link(home, 'README.md', 'Read the software and contribution guide')}</p></section>
 <section class="section callout"><div><h2>Start with the source</h2><p>Read the setup guide, check the trust model, or inspect the repository directly.</p></div>
 <nav aria-label="Starting points">${link(home, 'docs/human/GETTING_STARTED.md', 'Getting started')}${link(home, 'docs/SECURITY.md', 'Security model')}<a href="${repository}">GitHub repository</a></nav></section>`);
 
@@ -156,7 +159,7 @@ page(project, 'Project', project, `<section class="page-intro"><p class="kicker"
 <div class="feature-grid"><article><h2>Releases</h2><p>Browse published builds, assets, and release notes on GitHub.</p><a href="${repository}/releases">GitHub releases</a></article>
 <article><h2>Source code</h2><p>Browse the implementation and follow project changes.</p><a href="${repository}">MRML on GitHub</a></article>
 <article><h2>Contributing</h2><p>Read the project’s contribution and verification requirements.</p>${link(project, 'docs/human/CONTRIBUTING.md', 'Contributor guide')}</article></div>
-<section class="section prose"><h2>Documentation provenance</h2><p>The site renders ${documents.size} Markdown documents from MRML revision <code>${escape(revision)}</code>. The local snapshot may be ahead of the GitHub mirror. Use the dates, test environments, and status labels in the documents to interpret implementation and hardware claims.</p>
+<section class="section prose"><h2>Documentation provenance</h2><p>The site renders ${documents.size} Markdown documents from MRML revision <code>${escape(revision)}</code>. The <a href="${documentationSource}">source documentation on GitHub</a> is pinned to that revision. Use the dates, test environments, and status labels in the documents to interpret implementation and hardware claims.</p>
 <p>${link(project, 'docs/human/OVERVIEW.md', 'Project overview')} · ${link(project, 'VALUES.md', 'Project values')} · <a href="license.txt">MRML license</a></p></section>`);
 
 for (const [file, doc] of documents) {
@@ -166,7 +169,7 @@ for (const [file, doc] of documents) {
       if (child.type === 'image') {
         const image = child.attrGet('src');
         if (!/^(https?:)?\/\//i.test(image)) {
-          child.attrSet('src', new URL(image, repository + '/raw/HEAD/' + file).href);
+          child.attrSet('src', new URL(image, `${repository}/raw/${revision}/${file}`).href);
         }
       }
     }
@@ -189,6 +192,14 @@ ${toc.length ? `<nav class="toc" aria-label="On this page"><h2>On this page</h2>
 </div>`);
 }
 
+const renamedPages = [
+  ['reading/docs/microkernel.html', 'docs/GIGAKERNEL.md'],
+  ['reading/docs/gitd/edge/microkernel_port.html', 'docs/gitd/edge/GIGAKERNEL_PORT.md'],
+];
+for (const [output, current] of renamedPages) {
+  page(output, 'Documentation moved', catalog,
+    `<section class="page-intro"><h1>Documentation moved</h1><p>Continue to ${link(output, current)}.</p></section>`);
+}
 const assets = new Map([['assets/style.css', 'assets/style.css'], ['assets/filter.js', 'assets/filter.js'], ['license.txt', 'content/LICENSE']]);
 const allIds = new Map([...pages].map(([file, html]) => [file, new Set([...html.matchAll(/\sid="([^"]+)"/g)].map(match => match[1]))]));
 for (const [file, html] of pages) {

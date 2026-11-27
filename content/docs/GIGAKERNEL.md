@@ -1,4 +1,8 @@
-# MRML microkernel design
+# MRML Gigakernel design
+
+The MRML Gigakernel is named after Gigachad. It provides the privileged
+mechanisms for Total MicroVM isolation; ordinary apps and services belong in
+admitted microVMs. The name does not imply that full-system operation is ready.
 
 This file is the detailed implementation and dated evidence ledger. Stable
 project direction is in [ARCHITECTURE.md](ARCHITECTURE.md), normative boundaries
@@ -6,12 +10,134 @@ in [SECURITY.md](SECURITY.md), application direction in
 [APPLICATION_PLATFORM.md](APPLICATION_PLATFORM.md), dependency order in
 [ROADMAP.md](ROADMAP.md), and context-loss procedure in
 [RECOVERY.md](RECOVERY.md). Planned architecture in those documents must not be
-reported as implemented evidence here.
+reported as implemented evidence here. Platform skips and unavailable hosts in
+individual entries describe those runs. For current Windows testing scope see
+[Project status](PROJECT_STATUS.md#windows-testing).
 
 This document records design intent, not a claim of production readiness. The
 kernel is new, original Rust intended for CC0 dedication. Research informs
 requirements and trade-offs; no third-party implementation is copied or
 adapted.
+
+## How the Gigakernel compares
+
+These names describe different design choices: what belongs in the privileged
+core, how workloads are isolated, and how kernel correctness is established.
+They are not mutually exclusive categories.
+
+- **A conventional microkernel** keeps a small privileged core for mechanisms
+  such as scheduling, address spaces, and interprocess communication. Higher
+  level services run outside the kernel, usually in isolated user-space
+  processes. Microkernels can also support virtual machines. For example,
+  [seL4's white paper](https://sel4.systems/About/whitepaper.html) describes
+  capability-controlled systems that mix native components and virtual
+  machines. MRML shares the small-core and capability principles, but it
+  does not offer native user-space execution as an alternative for ordinary
+  apps or services.
+- **Hyperkernel** here means the specific
+  [2017 SOSP research kernel](https://syslab.cs.washington.edu/papers/nelson-hyperkernel.pdf),
+  not a generic name for a kernel that uses virtualization. Hyperkernel used
+  hardware virtualization to separate kernel and user address spaces and
+  hypercalls to enter the kernel. Its defining goal was automated formal
+  verification of a bounded, xv6-derived trap interface using Z3. It also
+  ran a filesystem and a network stack as separate user-space servers
+  ([§4.3](https://syslab.cs.washington.edu/papers/nelson-hyperkernel.pdf#page=11)),
+  so neither hardware virtualization nor moving those services out of the
+  kernel is unique to MRML.
+- **The MRML Gigakernel** enforces an operating-system placement rule:
+  [Total MicroVM isolation](ISOLATION_PLACEMENT.md) is the only ordinary
+  operating mode. Apps and services use admitted, supervised microVMs or remain
+  unavailable. The privileged core supplies launch, memory, and communication
+  mechanisms. Cross-VM access requires explicit, scoped, revocable capabilities;
+  merely running a guest or knowing another guest's identity grants no access.
+  The loader and virtualization substrate are required mechanisms, not another
+  way to run ordinary workloads.
+
+For example, the hosted storage probe exercises a read across two signed guests
+using one authorized page and verifies its retirement. It does not establish
+that an installed storage service or full-system Total MicroVM operation is
+ready. "Gigakernel" is MRML's name for this combination of design choices,
+not a claim of architectural priority or of formal verification equivalent to
+Hyperkernel's or seL4's.
+
+## Privileged footprint baseline
+
+Baseline: `a9ca7377`, x86-64, default release kernel image, dated
+`nightly-2026-11-26` on Arch WSL. Build with
+`mrml build org.mrml.system.bootloader --target uefi-x86_64 --release`
+without a diagnostic feature profile. In the resulting `mrml-kernel-pe.efi`,
+the only executable PE section was `.text`: **35,133 virtual bytes**
+(35,328 file bytes with alignment). The whole PE was 2,144,256 bytes;
+it was mostly data, not executable text. This excludes the separate EFI
+loader, and is not an estimate of source lines or a complete trusted base.
+
+The default image's privileged entry sets up descriptor and exception
+handling, decodes the boot handoff, and validates early kernel state.
+Malformed input and the terminal bootstrap path halt. The normal image
+does not yet start installed service MicroVMs, so there is no live guest
+service dispatch surface to count for this build. The DPL-3 user-call
+gate and guest-facing service paths in the diagnostic profiles are not
+part of the default boot baseline. The separate VMX monitor, hosted KVM
+and WHP, firmware, and the loader's package and memory-map handling are
+different trust boundaries and not included in the number above.
+
+For the first normal image that starts installed services, remeasure the
+executable sections and enumerate every guest-reachable entry: hypercall
+and trapped instruction dispatch, interrupts, route/queue validation, and
+page and device teardown wherever enabled. Keep only enforcement mechanics
+privileged; prefer movement of policy and parsing to admitted services
+where the working lifecycle can sustain it. Do not compare PE bytes
+directly with Hyperkernel's reported source-line count.
+
+Installed recovery now joins the configuration, authority checkpoint,
+deployment checkpoint, and signed-release file selections only when all
+were borrowed from the same validated recovery graph. Equal on-disk volume
+and generation numbers do not establish that relationship. This is a local
+provenance check; separate file capabilities and signature verification
+remain required. The hosted recovery regression rejects a checkpoint and a
+release selected from a separately validated copy with identical generation
+metadata.
+
+The installed recovery reader now selects exact service file generations
+from that retained graph and refuses to reuse control-plane files, repeat
+an object, or accept a missing or stale selection. Reading still requires
+an independently held file READ capability and uses the same retained
+recovery volume with extent verification. A hosted block fixture recovered
+and read a separate file through this path; the release file's READ handle
+could not be substituted. This validates the installed storage mechanism
+in a hosted fixture, not an installed boot or executable signature. The
+next integration step is to pass authenticated recovered service bytes to
+the complete executable preflight before creating guests.
+
+Recovery now also reads the full selected service file into a bounded
+caller buffer, using the length from the recovered metadata. It verifies
+the container signature and version under a separately supplied service
+trust root before parsing the PE. The read handle, file generation, trust
+root, and release assignment remain separate checks. A controlled block
+fixture recovered an independently signed multi-block executable and checked
+its payload digest; wrong file authority, insufficient output, wrong key,
+and an artifact below the pinned version floor were rejected. The returned
+executable can enter release preflight, but this reader test does not launch it.
+
+The hosted two-domain KVM startup test now reads both signed diagnostic
+executables, the deployment checkpoint, and the signed SystemRelease through
+the same selected block volume. It independently verifies both service
+signers, requires the complete executable set to match the admitted release,
+and uses the recovered executable buffers to start the two KVM MicroVMs.
+The test rejects a wrong signer and incomplete or substituted executable
+sets, observes both guests execute, verifies separate guest memory, and checks
+that the second guest still runs after the first is retired. The fixture is
+now serialized and synced to a raw volume image. The KVM test reopens that
+image read-only for both launch attempts. Recovery reads the configuration,
+authority and deployment checkpoints, release, and service files through the
+same volume; file errors never fall back to the memory used to build it.
+The portable storage regression rejects a changed service extent and a
+truncated image. This remains hosted integration evidence: the disk layout
+and owner approval are generated for the test. It does not verify firmware
+boot from installed media or production services under the normal Gigakernel
+boot path.
+
+## Implementation evidence
 
 The current UEFI filesystem calls load boot artifacts and the current GOP
 renderer supplies bounded bring-up diagnostics. They are not the planned native
@@ -27,7 +153,7 @@ placement and active unsupported blockers, and a typed resource or transport
 failure cancels preparation without creating a native fallback. Six focused
 tests are included in the Windows and Arch Linux hosted kernel suites.
 This mechanism does not create VMs, select providers, allocate resources, or
-provide the first dual-placement service, so Total MicroVM remains **PLANNED**.
+run a full system, so full-session Total MicroVM remains **PLANNED**.
 
 Unavailable isolation attempts now remain in a same-capacity ordered ledger
 instead of disappearing when their prepared slot is released. Each record binds
@@ -39,22 +165,12 @@ failure. The Total report exposes the number of unavailable eligible domains but
 does not miscount them as running native fallback. Focused tests cover this in
 both hosted suites.
 
-A bounded service-routing prerequisite now composes that admission table with
-distinct native-service and microVM backend entry points. Its typed specification
-preserves exact interface, interface-generation, provider-generation, and policy-
-generation identity across either placement. It rejects Total-mode native service
-before invoking a backend, records microVM launch failure as unavailable, and
-never retries through the native entry. This is **PARTIALLY IMPLEMENTED** kernel
-mechanism and focused simulation evidence only. The configuration package now
-implements a concrete adapter with separately typed native-service and microVM
-launchers, and its manifest admits both forms. Two focused configuration tests on
-Windows and Arch Linux preserve the exact interface/provider generations across
-both routes and prove microVM unavailability cannot call the native launcher.
-The native launcher is wired to supervision and the microVM launcher now owns a
-transaction-committed KVM/WHP guest through exact endpoint retirement. This does
-not yet automatically choose a provider or placement, provide general cross-
-placement transport, or complete the representative dual-placement-service
-milestone.
+The freestanding service router accepts only microVM launch specifications and
+exposes only microVM backend dispatch; direct application dispatch is likewise
+excluded. A failed guest launch records typed unavailability without fallback.
+The configuration launcher owns its admitted guest through exact endpoint
+retirement, demonstrated in signed hosted WHP and KVM probes. Existing hosted
+direct-lifecycle tests do not define an OS mode or an installation option.
 
 The first component data-plane prerequisite now composes the canonical Zstd
 ABI-3 request with the existing kernel IPC/shared-memory mechanisms outside the
@@ -63,8 +179,8 @@ bounded `TaskRuntime` inbox and exactly one attenuated read/write shared-buffer
 capability, revalidates its VM/task binding, copies only the declared compressed
 input into private scratch, invokes the existing provider, writes only the exact
 successful output range, and erases scratch on every return path. The Zstd and
-ZIM manifests now select `isolated-service`; Zstd permits native-service or
-microVM placement with a native-service floor. Twenty-two focused Zstd tests pass
+ZIM manifests select `isolated-service`; Zstd is restricted to microVM
+placement. Twenty-two focused Zstd tests pass
 on Windows and Arch Linux, including actual inbox delivery, revocation, wrong-
 task rejection, distinct VM/task projections, invalid-frame no-write, and
 scratch exhaustion. The provider now also has a bounded userspace receive/reply
@@ -94,7 +210,11 @@ policy generation; the data plane cannot substitute them. This is hosted
 unit/simulation evidence. A register-level userspace adapter emits the exact
 existing receive-buffer (5), shared-buffer read/write (7/8), capability-release
 (12), and send-buffer (4) frames; a full mock-trap test proves the bounded call
-and release-before-response order. The canonical provider now also builds a
+and release-before-response order. A successful buffered receive preserves the
+exact kernel-recorded sender task token in R8, for both immediate and blocked
+completion. The token identifies the sender; it does not grant authority.
+The FAT32 block client requires that token to match its launch-bound provider
+before copying shared bytes. The other buffered result fields are unchanged. The canonical provider now also builds a
 standalone x86-64 UEFI service binary containing that `int 0x80` implementation,
 one private 4 KiB scratch page, and immutable launch-register endpoint/caller/
 provider-generation inputs. Windows and Arch Linux target builds pass; Windows
@@ -103,8 +223,8 @@ subsystem 10, and nonzero entry RVA `0x0000ae90`. The allocation-free target
 floor supports raw/RLE blocks and rejects entropy-coded blocks pending bounded
 table migration. No service process or guest executed, the actual generation
 resolver is not connected to launch, and supervision/resource-pool and WHP/KVM
-parity remain absent, so the representative dual-placement service remains
-**PARTIALLY IMPLEMENTED**.
+parity were absent at this checkpoint. Later signed microVM probes are
+recorded below.
 
 The native half is now wired to actual kernel supervision. `ServiceSupervisor`
 preflights object and slot capacity before task creation, then publishes the new
@@ -181,7 +301,7 @@ establishes confidentiality, integrity, verified boot, or correct GPU execution
 against that host.
 
 The production architecture is therefore a bare-metal type-1
-microkernel/monitor launched by measured UEFI. The kernel contains only
+Gigakernel launched by measured UEFI. The kernel contains only
 mechanisms: address spaces, scheduling, interrupt/IOMMU control, capabilities,
 IPC, and VM entry/exit. A small, networkless management service owns policy and
 domain lifecycle but receives no direct memory authority over ordinary service
@@ -1322,8 +1442,9 @@ into bounded static storage and passes its address and exact length to a
 separately built kernel PE entry point.
 
 `mrml-loader.efi` is now a repository-owned PE/COFF UEFI application with raw
-ABI definitions rather than a firmware crate dependency. It locates required
-GOP and RNG protocols, rejects unsupported modes and zero entropy, obtains a
+ABI definitions rather than a firmware crate dependency. It locates the required
+GOP protocol and obtains boot randomness from the firmware RNG or the documented
+x86-64 fallback. It rejects unsupported modes and zero entropy, obtains a
 bounded memory map, retries the map-key-sensitive `ExitBootServices` transition,
 and retains only copied framebuffer values afterward. The framebuffer changes
 from blue before the transition to green after successful exit, providing a
@@ -1955,7 +2076,9 @@ kernel using the expanded evidence contract still reached the QEMU GOP marker.
 The standalone image also has a `production-policy` feature. Such builds embed
 `MRML_KERNEL_MIN_VERSION` independently of the loader and validate the decoded
 handoff with `BootPolicy::production` before touching the framebuffer or
-starting subsystems. Missing or malformed compile-time policy fails closed. A
+starting subsystems. Missing or malformed compile-time policy fails closed.
+The build rejects combinations of `production-policy` with diagnostic kernel
+features. Probe images remain standalone test fixtures, not OS boot modes. A
 properly hash-signed version-6 production image transferred under loader-owned
 CR3/GDT/IDT but refused the deliberately unmeasured, non-Secure-Boot QEMU
 handoff, leaving the loader's `RGB(20,33,53)` stage unchanged. All terminal
@@ -2032,7 +2155,7 @@ zeroed, and returns the checked preferred-base entry address. A separate load
 plan describes read-only NX headers and the final W^X permission of every
 section. Platform code must populate pages while NX is active and install the
 final permissions only after copying completes. Mapped image size is capped by
-artifact type: 64 MiB for the microkernel, 128 MiB for a service, and 512 MiB
+artifact type: 64 MiB for the Gigakernel, 128 MiB for a service, and 512 MiB
 for a VM boot image. Both the signer and verified runtime admission enforce the
 same quota before allocation. Optional PE base relocation tables are fully
 validated before loading, capped at 65,536 entries, and accept only padding and
@@ -2088,7 +2211,7 @@ out-of-range pixels and rectangles are rejected and row padding is never used
 as visible storage. Serial remains an optional developer diagnostic path.
 
 The native artifact chain uses an original SHA3-512 Lamport signature verifier.
-Production policy requires separately typed signatures for the microkernel, VM
+Production policy requires separately typed signatures for the Gigakernel, VM
 images, service images, launch policy, and embedded CUDA-kernel bundle. Each
 trust root pins the SHA3-512 digest of its public key and minimum artifact
 version. Signed statements bind artifact type, version, byte length, and content
@@ -2319,6 +2442,158 @@ queues, directory-handle grants, measured images, and optional IOMMU device
 assignment. Bare metal uses native architecture modules and the CPU inference
 backend until a separately isolated GPU service is available.
 
+### Hosted kernel and nested VMX evidence
+
+A freshly signed `pci_configuration_probe` Gigakernel package
+(SHA-256 `5053c9cf6fe76ab26c5debca898c854377ee550158f50fd7981b9d5b746d1a6a`)
+booted as a KVM guest in Arch WSL. The runner first rejected a substituted
+package root, then verified virtual block PCI-MMIO write/read/flush, BAR
+withdrawal and continued guest execution, guest replacement, and pending-I/O
+reset isolation. This is a real Gigakernel image under the hosted KVM backend,
+not execution as a guest of MRML's own native monitor. The default hosted
+`boot` marker check did not pass and the separate SMP probe hit its runtime
+deadline. Neither result qualifies a production or multicore guest boot.
+
+The [UEFI VMX diagnostic](platform/UEFI_BOOT_MANAGEMENT.md#dragonair-gigakernel-vmx-test)
+separately reaches a paged 64-bit guest under MRML's native VMX monitor inside
+QEMU with nested KVM. That guest uses a tiny bootstrap workload. A native
+Gigakernel-guest pass requires independent admission of the signed kernel and
+package, PE relocation followed by supervisor-only section permissions,
+guest-owned page tables and guarded stacks, a read-only canonical boot
+handoff carrying the verified measurement, and entry through the actual
+kernel ABI. The monitor must see a bounded, kernel-generated terminal result;
+merely reaching VM entry does not qualify. The opt-in signed nested image
+now reaches real kernel entry, validates its early boot handoff, and runs a
+two-task scheduler smoke inside L2. The guest task runtime blocks an empty
+receiver, denies a wrong endpoint capability, and completes an authorized
+request/reply with the expected sender and sequence. Only then does the
+monitor observe the designated completion exit. This verifies in-kernel
+runtime APIs inside L2, not user-space task execution or installed services.
+A separate non-yielding fixture returns control through the VMX preemption
+timer, stays parked while the signed Gigakernel runs, then resumes its
+interrupted VMCS and uses its own retained integer state to complete. That
+does not yet establish preemptive runtime scheduling. The native
+entry trampoline starts each freshly launched guest with zeroed general-purpose
+registers (RSP is VMCS-owned). The cooperative switch test now requires each
+of two guests to resume with its own register value, not merely with its
+memory intact. The opt-in signed nested diagnostic now checks initial x87/XMM
+state and preserves a timer-preempted guest's x87 data and XMM value across a
+separate signed guest. The monitor checks that its own x87 rounding mode
+returns unchanged. The legacy-state profile does not admit additional CR4 state
+features such as OSXSAVE. This does not qualify extended vector state or
+general untrusted-guest CPU-state isolation. In the same diagnostic a
+separately signed Zstd service image now runs in a physically disjoint
+MicroVM and processes a canonical ABI-3 decompress request through the real
+native provider. The monitor supplies an NX read-only request and an NX
+writable reply, validates the exact trapped completion and decoded reply,
+and does not forward I/O. The measured Gigakernel now initiates that
+request itself. The monitor parks it at an exact trapped instruction and
+relays its request and the service's reply through the existing
+capability-checked interface queue, rejecting a foreign endpoint, a replayed
+reply, and a request after revocation. The resumed Gigakernel checks the reply
+itself. The queue is monitor-owned, with bounded stopped-guest copies, not
+a mapped peer queue or an installed service scheduler.
+
+The recovered-deployment startup transaction now keeps provisional service
+endpoints private until the complete admitted set and runtime proof both
+succeed. On construction, admission, or proof failure it withdraws logical
+routes and invokes backend teardown in reverse start order. A failed teardown
+retains the exact endpoint for retry. Hosted KVM and WHP component runners
+create the configuration launcher endpoint inside the transaction, before
+they publish their runtime result. The signed two-required-domain unit test
+injects a late startup failure and a failed first teardown, verifies no
+running admission and no runtime proof, then retries the same endpoint and
+checks that its token no longer opens the guest. It also verifies cleanup
+order on a commit failure. A fresh signed v2 release completed the hosted
+KVM component probe through this path with one classified domain in a
+MicroVM, zero native fallback, and the expected halt. The configuration
+suites pass 55 tests on each host; the KVM and WHP runners pass 16 and 12.
+That single-domain probe did not exercise a live two-domain rollback.
+
+The hosted KVM test now recovers a signed two-domain fixture and runs the
+same recovered-owner publication transaction used by the component runners.
+The first real KVM guest executes a marker before an injected second-service
+startup refusal. An injected first stop refusal leaves that exact guest
+owned by the failed transaction for retry, without publishing a route set
+or runtime proof. A successful retry revokes its endpoint and releases the
+guest. Recovering the same release again admits two fresh guests with zero
+native fallback. The KVM and WHP component runners now reject a missing
+complete preparation instead of allowing the generic single-route branch. Configuration launch generations are
+unique across launcher objects in the same runtime; an endpoint retained
+from the failed attempt cannot open or revoke a same-spec replacement. Both
+new guests execute independent markers, including the second after retirement
+of the first. Endpoint tokens are neither persistent nor cross-runtime
+authority.
+
+Verification: `mrml test org.mrml.service.config --target windows` and
+`mrml test org.mrml.service.config --target linux` each passed 56 tests.
+`mrml test org.mrml.tool.vmm-whp-run --target windows` passed 12, and
+`mrml test org.mrml.tool.vmm-kvm-run --target linux` passed 16 with one
+explicitly opt-in test. On Arch WSL with a usable KVM device, the opt-in test
+passed when run as:
+
+```text
+target/mrml-native/linux/debug/mrml-kvm-run_bin_tests --ignored --exact tests::live_kvm_total_startup_rollback_and_same_spec_restart
+```
+
+This is hosted KVM evidence using small guest fixtures, not a two-service
+installed-media boot, an independent kernel-resource audit, device/DMA
+teardown evidence, or bare-metal validation. Startup and initial stop refusal
+are injected at the host adapter; no backend-native stop failure was forced.
+The release-mode component probes still use one domain for the existing ZIM
+and Zstd pair. This change does not alter the Chromebook boot path.
+
+Controlled shutdown of a recovered component probe now consumes the complete
+runtime authorization and withdraws every running admission before stopping
+the guest owner. KVM and WHP report readiness during startup and a distinct
+`isolation-shutdown` event after the hosted cleanup path succeeds, rather
+than reporting the stopped guest as running. Withdrawal produces only a
+count of retired logical admissions, never a backend destruction proof or a
+restart authority. The explicit live KVM test withdraws both admissions,
+then retires the exact endpoints. This does not add crash supervision,
+installed-media service restarts, or physical device/DMA teardown.
+
+The same freshly signed `component-service-probe` fixture completed on KVM
+and WHP and reported `runtime=withdrawn|retired_domains=1`. The Windows
+release runner initially exited with `0xc00000fd` after authenticated recovery
+with its default 1 MiB PE stack. The runner now reserves 8 MiB with the same
+4 KiB initial commitment; the rebuilt executable completed the same signed
+probe. This is a bounded hosted-runner setting, not a guest stack change.
+
+Recovered activation now retains a bounded mapping from each authenticated
+package ID to its assigned domain, version, class, and payload digest. The
+hosted KVM and WHP component probes check the independently authenticated
+Zstd executable against that exact assignment before constructing the guest.
+This check does not grant routing or memory authority.
+
+The opt-in KVM recovery test now builds two distinct PE service fixtures,
+signs them under separate test roots, includes their actual payload digests
+in one signed release, and rejects wrong-root or cross-domain substitutions.
+The recovered owner starts the two executable images in separate KVM VMs.
+They produce distinct markers; a write to the same guest-physical address
+in the first does not appear in the second; and the second resumes after the
+first is retired. The same test exercises failed startup, retries teardown
+on the original guest, and rejects its retired endpoint after restart.
+Windows and Arch Linux kernel suites passed (763 each). KVM runner tests
+passed (16 plus the explicit live test); WHP runner tests passed (12). Fresh
+signed grouped ZIM/Zstd component probes still pass on both KVM and WHP.
+The separately signed two-VM test runs small diagnostic executables on hosted
+KVM; it does not boot the installed service set, exercise peer IPC, or qualify
+physical hardware. The grouped runner still launches ZIM and Zstd together.
+
+The recovered hosted startup now preflights the complete eligible service
+executable set before constructing its guest. The check consumes no routes
+and rejects missing, duplicate, or mismatched package assignments. Every
+member must carry its own authenticated package version and payload digest,
+even when two packages share one domain. The provider still separately
+matches the route's provider generation. KVM and WHP use this check for both
+signed artifacts in the grouped ZIM/Zstd probe. The opt-in separate-VM KVM
+test accepts either order and rejects incomplete, duplicate, and substituted
+sets before creating the guest objects. A freshly signed release containing
+ZIM version 1 and Zstd version 2 completed on both KVM and WHP with zero
+fallback and retired its grouped domain. This service-only gate does not
+implement installed-media discovery or peer IPC.
+
 The implemented backend-neutral VM boundary uses a fixed 64-byte `MRMLHC01`
 hypercall descriptor and a caller-owned copy buffer. Reserved bytes and
 operation-specific unused fields must be zero, sequences are exact and advance
@@ -2387,7 +2662,7 @@ RFLAGS bit 1 is set, and long mode enables paging, protected mode, PAE, NX, and
 supervisor write protection with explicit 64-bit code and data segments. The
 bootstrap adapter deliberately omits KVM's in-kernel IRQ chip until interrupt
 delivery is configured. Guest page-table construction and
-the backing store for it are now shared with the microkernel's page-table
+the backing store for it are now shared with the Gigakernel's page-table
 builder. A fixed guest-RAM arena returns only freshly zeroed frames and rejects
 reads or writes to unallocated tables, out-of-range entries, read-only RAM, and
 arena exhaustion. KVM therefore inherits the same hardware W^X, NX, user-bit,
@@ -2946,7 +3221,7 @@ two-setting commit. An authorized read can canonically return an unset value.
 
 Adaptive-isolation configuration now has one typed, bounded control-plane path.
 A canonical 16-byte record distinguishes component preferences from system
-Balanced, More Isolated, Total, and Custom modes; each target remains bound to
+the Total MicroVM policy; each target remains bound to
 its own setting object, and a component descriptor fixes its native placement
 class. A revision-bound application plan first loads both values through exact
 READ capabilities, then repeats both reads and compares the complete records and
@@ -2969,9 +3244,8 @@ and malformed bounds are rejected. No alternate form is selected after failure.
 This bounded check neither classifies workloads nor selects providers, VM
 templates, or resources. A composed route now repeats the policy reads, package
 checks, kernel mode/generation match, and exact interface/provider binding in
-one call before dispatching only to the selected native-service or microVM
-launcher. Revision drift and admission mismatch invoke neither backend; backend
-failure is not retried through the other form. Windows and Arch Linux each pass
+one call before dispatching to the microVM launcher. Revision drift and
+admission mismatch prevent launch; backend failure has no fallback. Windows and Arch Linux each pass
 all 40 focused configuration tests. This remains unit/simulation evidence and
 not the complete general package resolver or broad cross-placement runtime.
 
@@ -3430,7 +3704,7 @@ composition: it retains the immutable applied persistent policy, records the
 typed overlay separately, strengthens the effective mode to Total for that boot,
 and preserves the exact configuration policy generation. Native-only bounds
 fail before backend invocation. WHP and nested KVM both inject this same typed
-overlay over a Balanced/native configuration before their release-derived
+request in the boot handoff before their release-derived
 eligible component route; neither adds native fallback. A focused recovered-
 state path now accepts the real canonical `BootHandoff` type only after
 authenticated authority recovery, monotonic epoch advancement, and
@@ -3448,12 +3722,12 @@ evidence.
 The hosted WHP and nested-KVM service runners exercise the configured
 preparation path before real guest construction. Both build component and system
 policy records under separate setting capabilities, atomically commit a
-Balanced/native revision, reauthorize the plan, compose the explicit one-boot
+stored policy revision, reauthorize the plan, compose the explicit one-boot
 Total overlay, apply the same native-service/microVM package bounds, bind the
 verified provider generation, and reserve the kernel transaction before the VMM
 constructs the guest. The previously implemented retained lifecycle consumes
 the resulting exact specification. Fresh same-release runs on 2026-08-26
-reported `configured=balanced`, `component=native-service`,
+reported the configured selection, component placement,
 `override=total-microvm-once`, `effective=total-microvm`, `eligible=1`,
 `microvm=1`, and `native_fallback=0` on both. WHP timings were
 `19755/5559/2254/52085us` and KVM timings were
@@ -4055,8 +4329,22 @@ The resulting exact volume/root/file selections are checked before cleanup.
 This increases the monotonic block protocol from 18 to 51 requests. A fresh
 one-use-signed WHP run completed the established cleanup sequence; KVM was not
 rerun because the configured Linux cross-host Rust target was unavailable.
-The deployment/release placeholder contents are not authenticated and this is
-not Total admission or runtime-placement evidence.
+The deployment/release placeholder contents in that historical run were not
+authenticated, and that run did not exercise Total admission.
+
+The current `block-service-probe` uses the same strict Total service admission
+as the signed compositor fixture. Both hosted runners reserve the exact test
+service route before constructing the guest, with separately verified kernel
+and service images. The block-service receiver compares the kernel-reported
+sender token to its launch-bound peer before processing block requests or the
+completion message. The client receives separate exact configuration read,
+write, and control grants rather than reusing broad handles across operations.
+On success the runner verifies the complete ordered
+cleanup and retires the guest before reporting one microVM and zero fallback.
+This remains a RAM-backed diagnostic: the client and service share one hardware
+microVM but have separate address spaces, and the installed coordinator and
+cross-VM block-provider transport are not yet wired. The same signed artifact
+set passed under nested KVM and WHP on 2026-11-27.
 
 Fresh independently signed version-1 artifacts passed on 2026-08-24:
 
@@ -9694,10 +9982,10 @@ the post-run native state with the captured state. Stronger/different classes,
 nice values, real-time policies, admission mapping, and general scheduler
 integration remain planned.
 
-### Hosted supervised native Zstd service lifecycle
+### Hosted Zstd lifecycle regression
 
-The exact-generation Zstd ABI-3 path now has a concrete native-service control
-plane in addition to the separately hosted WHP/KVM microVM probe. A
+The direct Zstd lifecycle exists only for hosted regressions and does not
+compile into the freestanding OS. The signed WHP/KVM microVM probe is separate. A
 `ZstdNativeServiceBackend` requires a nonzero reply object and creates the
 provider as a distinct-address-space `TaskRuntime` task through the existing
 `ServiceSupervisor`, then returns an immutable endpoint

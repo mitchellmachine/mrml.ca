@@ -2,14 +2,14 @@
 
 > **Historical migration ledger.** This file preserves dated migration
 > evidence and therefore contains earlier package and edge counts. It is not a
-> current inventory. See the generated [workspace status](../STATUS.md) and the
+> current inventory. See [Project status](../PROJECT_STATUS.md) and the
 > root/package manifests for current facts.
 
 **Recorded status: NATIVE GRAPH IMPLEMENTED; PACKAGING PARTIAL.** At this
 migration checkpoint the workspace contained 46 package-local manifests and
 131 declared compile edges. Those figures are intentionally retained as dated
 evidence. Current authoritative facts come from the root and package manifests,
-`mrml.lock`, and the generated [workspace status](../STATUS.md). Canonical
+`mrml.lock`, and live manifest checks. Canonical
 package and fixed boot `SystemRelease` construction were implemented at this
 checkpoint; general Store release, image, and publication work remained
 incomplete.
@@ -32,7 +32,7 @@ incomplete.
   compile edges are excluded from that package graph.
 - The only remaining `Cargo.toml` and `Cargo.lock` are the clean-source
   stage-zero bootstrap for `mrml`; package-local Cargo manifests are gone.
-- The current `.gitea/workflows/ci.yml` owns stage-zero, manifest, lock,
+- At this migration checkpoint, `.gitea/workflows/ci.yml` owned stage-zero, manifest, lock,
   exact-input audit, assurance, and full host-test gates. The earlier proposed
   standalone `manifest-v2.yml` file was not retained as a current workflow.
 - On Windows GNU/LLVM, 20 warm process invocations of `mrml manifest check`

@@ -59,7 +59,7 @@ default behavior, Polonius state, trait-solver state, relevant unstable feature
 state, MRML-relevant semantic deltas, and conformance outcome under
 `docs/compiler/oracles/`. Preserve the initial
 [ORACLE-0001](compiler/oracles/ORACLE-0001.md); the current default build and
-behavioral reference is [ORACLE-0003](compiler/oracles/ORACLE-0003.md).
+behavioral reference is [ORACLE-0004](compiler/oracles/ORACLE-0004.md).
 
 An oracle is a reproducible observation point, not a permanent compatibility
 ceiling. To advance it:

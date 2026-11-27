@@ -24,7 +24,7 @@ are memory-safe. `mrml-tools` provides experimental public-HTTPS fetch and
 search tools; it does not automate an installed browser and is not an MRML
 browser engine or OS browser security boundary.
 
-**PLANNED:** safe native application admission and SDK, stable service
+**PLANNED:** memory-safe application admission and SDK, stable service
 protocols, application microVM projection, trusted compositor, semantic scene
 graph, HiDPI desktop, browser, and capability-mediated AI control plane.
 
@@ -38,8 +38,8 @@ WebAssembly runtime, or CET/IBT application-admission enforcement.
 
 ## Foundational application model
 
-Native application packages may use static dependencies, in-process dynamic
-interfaces, or isolated service interfaces. The stable component contract is an
+MRML application packages may use static dependencies, approved in-process
+interfaces within the same admitted microVM, or separately isolated services. The stable component contract is an
 explicit MRML interface—not Rust's compiler ABI, a provider package name, or a
 DLL/SO filename. Exact resolution, loading, lifetime, and update behavior are
 specified in [packages/COMPONENT_INTERFACES.md](packages/COMPONENT_INTERFACES.md).
@@ -50,15 +50,15 @@ Applications receive explicit quantitative memory pools according to
 [memory/MEMORY_RESOURCE_MODEL.md](memory/MEMORY_RESOURCE_MODEL.md), not ambient
 unlimited allocation. Usage introspection is separate from memory-content access.
 
-The future platform combines memory safety, capability authority, process
-isolation, optional stronger VM isolation, stable application-facing contracts,
+The future platform combines memory safety, capability authority, mandatory
+MicroVM isolation, and stable application-facing contracts. It also includes
 a trusted compositor, machine-readable GUI state, first-class HiDPI, local and
 remote LLM control, explicit security boundaries, and minimal ambient authority.
 Historical POSIX/C security and ABI conventions and legacy compatibility do not
 dictate the foundation.
 
 ```text
-native MRML application
+MRML application in an admitted MicroVM
     -> approved memory-safe language/runtime
     -> safe MRML SDK
     -> versioned MRML service protocols
@@ -79,7 +79,7 @@ disk, ambient host filesystem/network, global input, or secure attention.
 
 ### Unsafe-code policy
 
-- Ordinary native applications: unsafe code prohibited by default.
+- Ordinary MRML applications: unsafe code prohibited by default.
 - System services: unsafe strongly discouraged and permitted only when
   technically necessary.
 - Drivers, VMM, kernel, compiler, and hardware boundaries: unsafe permitted only
@@ -100,30 +100,21 @@ accepts self-asserted compiler metadata as proof.
 
 ### Execution classes
 
-Per-component placement preferences, mandatory floors, supported forms,
-persistent owner policy, and the one-boot total-microVM request are canonical in
-[ISOLATION_PLACEMENT.md](ISOLATION_PLACEMENT.md). Typed Manifest V2 policy
-validation is **PARTIALLY IMPLEMENTED**; microVM placement, Settings, and strict
-Total runtime/boot enforcement remain **PLANNED**. Total mode never converts a
-failed eligible microVM launch into native execution. Balanced may select a
-visible supported native placement where the package floor permits. These rules
-refine the classes below without introducing another sandbox architecture.
+[Total MicroVM placement](ISOLATION_PLACEMENT.md) is mandatory for ordinary
+MRML applications and services. If a workload cannot start with its required
+projections, it remains unavailable. Memory safety and CPL3 are complementary
+controls inside the guest, not alternative placements. End-to-end application
+admission remains incomplete.
 
-1. A native safe application is a memory-safe, isolated CPL3 process controlled
-   by capabilities.
-2. A strongly isolated MRML application, or small related group, runs inside a
-   microVM with MRML application interfaces projected across the VM boundary.
-3. A compatibility application runs in an explicit legacy guest environment,
-   potentially Linux or Windows where lawful and technically appropriate.
+1. An ordinary MRML application runs in an admitted microVM with projected
+   MRML interfaces and an approved memory-safe language/runtime.
+2. An unsafe or legacy compatibility application runs in an explicitly
+   isolated guest environment. Compatibility grants no additional authority.
 
-Unsafe and legacy ecosystems remain inside their VM trust boundary. MRML does
-not weaken native policy to make legacy binaries appear native. WebAssembly is
-not a fourth system application class.
-
-Where practical, native and microVM applications use the same high-level SDK.
-Native calls reach direct service IPC; microVM calls use a paravirtualized,
-capability-preserving transport. The security boundary changes, not the
-conceptual API. VM transport must not manufacture, widen, or confuse authority.
+Applications use the safe SDK over versioned service protocols. Cross-domain
+calls use a capability-preserving transport. Windows and Linux host tools
+are outside the MRML OS execution policy; they do not authorize a native
+MRML OS placement.
 
 ## WebAssembly and browser execution
 
@@ -218,8 +209,8 @@ object-creation policy, presentation, persistent desktop state, guest mapping,
 and WHP/KVM GUI execution remain unimplemented.
 
 The distinct `org.mrml.app.gui-probe` application is now a
-**PARTIALLY IMPLEMENTED** representative client. Its Manifest V2 policy permits
-native-process or microVM placement, while its `no_std` client state machine
+**PARTIALLY IMPLEMENTED** representative client. The hosted regression covers native-process fixtures and microVM placement;
+only the latter represents ordinary MRML OS execution. Its `no_std` client state machine
 constructs only the canonical interface-owned 312-byte frame and accepts only a
 typed completion for the one outstanding serial. Native and microVM placement
 therefore do not change application protocol bytes. A separately signed release
@@ -398,8 +389,8 @@ and propose unsafe actions. The enforced property is that a bad decision cannot
 exceed the session's delegated authority, not that the model always decides
 safely.
 
-Native applications obtain networking, audio, USB classes, and input through
-capability-bound userspace services, not VMM devices or raw hardware. Network
+Ordinary applications in microVMs obtain networking, audio, USB classes, and
+input through capability-bound service interfaces, not raw hardware. Network
 connection objects are distinct from raw packet authority. Audio playback is
 distinct from microphone capture. USB composite interfaces are independently
 grantable. Input is routed by trusted host services and compositor focus; raw

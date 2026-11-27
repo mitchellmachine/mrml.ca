@@ -2,10 +2,11 @@
 
 This roadmap is dependency ordered. It describes intended work, not completion
 claims. Status is determined from source, tests, and the evidence ledger in
-[MICROKERNEL.md](MICROKERNEL.md), using the vocabulary in
-[ARCHITECTURE.md](ARCHITECTURE.md). The machine-generated current workspace
-inventory is [STATUS.md](STATUS.md). Numbered component counts later in this
-file are dated migration chronology, not current package totals.
+[GIGAKERNEL.md](GIGAKERNEL.md), using the vocabulary in
+[ARCHITECTURE.md](ARCHITECTURE.md). [Project status](PROJECT_STATUS.md) connects
+the current workspace, compiler, hosted services, and verification scope. The
+numbered component counts below belong to dated migration chronology, not the
+current manifest.
 
 ## Work-in-progress limit
 
@@ -17,6 +18,154 @@ when implementation, tests, review, commits, and performance/security evidence
 remain independently attributable.
 
 ## Current priority
+
+x86-64 remains the primary MRML OS bring-up target. macOS host support and
+ARM64 support are planned separately from this work. Strict Total MicroVM
+remains the only MRML OS mode.
+
+The current USB gate is native controller qualification. Signed KVM guests
+have already written, flushed, and independently verified the exact fixture
+change on both emulated USB speeds at `40554703`. Next, qualify the controller's
+scratchpad/page-size requirements, firmware handoff, and VMX/VT-d assignment
+and teardown. Keep the planned physical write target separate and expendable.
+The Chromebook inventory identifies a shared USB boot controller; it does not
+establish an isolated handoff or a physical write. See the
+[storage design and evidence](storage/STORAGE_AND_OPTICAL.md).
+
+## Earlier storage and supervisor gates
+
+The hosted signed FAT32 guest qualification gate **PASSES** on Windows WHP
+and Arch WSL2 nested KVM. The real signed service mounts the synthetic volume,
+opens and reads `PROBE.TXT`, retires through `ServiceSupervisor`, rejects its
+stale route and file handles, and reopens and reads the same file from a fresh
+instance without rebooting. Run `tools/ci/test-native-fat32-restart-whp.ps1` or
+`bash tools/ci/test-native-fat32-restart-kvm.sh`. This is an opt-in, single-vCPU
+guest qualification with synthetic media and disposable signing keys. It is
+not physical-device evidence or a general production storage launcher.
+
+Early-boot display is separate from the storage gate. The UEFI loader prefers
+the selected output's checksummed EDID base-block preferred timing if GOP
+offers a supported linear mode of that size. It otherwise tries 1024x768,
+retains a usable live mode, or tries another supported linear mode. Normal
+boot does not draw into the framebuffer after firmware exit. The compositor
+has a bounded scanout renderer; it is not yet launched with a live framebuffer
+mapping. The opt-in `mrml usb test` path exercises two disjoint instances
+of the signed service through the UEFI loader. It shows
+`FAT32 RESTART: PASS - 28 BYTES` only after
+cleanup, stale-handle denial and exact reread. QEMU/OVMF verified the full
+trace and framebuffer with the embedded image. This does not qualify any
+physical device, native USB I/O, compositor or display driver.
+
+The firmware bring-up plan also includes a
+[bare-metal USB smoke test](platform/UEFI_BOOT_MANAGEMENT.md#bare-metal-usb-bring-up).
+It runs the same embedded fixture on one identified x86-64 UEFI machine. The
+USB stick is boot media only; this does not qualify a native storage controller.
+The embedded fixture is separate from the read-only Dragonair inventory;
+neither qualifies a physical write.
+
+An earlier storage gate was defined as a QEMU/OVMF guest boot with a separate disposable
+FAT32 disk attached to an emulated storage controller instead of serving
+sectors from the embedded image. The signed FAT32 service should read the same
+known bytes through the guest driver, restart under supervision without a guest
+reboot, reject stale route and file handles without submitting device I/O,
+then reopen the file and read the same bytes again. Keep the test disk
+read-only to the guest and run the check in CI once it is reproducible.
+QEMU is sufficient for this gate, not evidence of physical compatibility.
+Physical storage-controller qualification stays deferred; no host physical
+disk is part of the QEMU gate.
+
+Bring-up evidence against `31087f19` plus the FAT32 dispatch regression:
+the real dispatch loop, on a synthetic block device with modeled syscalls,
+mounts, looks up, opens and reads exact file bytes, unmounts and remounts, then
+rejects both an old mount token and reuse of the old file handle with the
+fresh mount generation. Neither stale request writes the shared buffer or
+issues block I/O. FAT32 (103 tests) and storage (168 tests) passed on native
+Windows gnullvm and Arch WSL2 with ORACLE-0004; the native FAT32 image built.
+This does not exercise provider restart, CPL3, or device hardware.
+
+In this earlier run, the independent `service-restart-request-probe` blocked
+live supervisor qualification. A fresh `service_restart_request_probe` UEFI
+kernel and default native `org.mrml.system.service-image`, signed with separate
+disposable keys, reached the same earlier configuration-response mismatch on
+both backends: while waiting for stage 2, each received frame port `0x4d59`
+with word `0x001b230d` (user-mode general-protection fault). No successful
+restart was observed in that run. Diagnose the guest failure before the
+expected response rather than accepting the fault or weakening the expected
+trace. This is distinct from the FAT32 dispatch regression and is not evidence
+of a FAT32 fault.
+
+As a control, the ordinary `service_probe` kernel used the same signed
+service image. KVM passed the host policy setup and reached the same guest
+fault without the restart manager. WHP's ordinary mode stopped earlier in
+the host-side policy fixture with `Unauthorized(PermissionDenied)`. Do not
+treat these as one diagnosed cause or grant additional rights to the fixture
+just to advance the probe.
+
+The signed restart-request probe now **PASSES** on WHP and nested KVM.
+The saved guest instruction mapped to the fixture's deliberate fail-stop
+after configuration request 2 was rejected at revision 0. The sender had
+delegated `READ | WRITE` for an update that requires an exact `WRITE` leaf.
+It now delegates write-only for the commit and retains the separate read-only
+transfer for policy lookup. The WHP host policy fixture now also uses distinct
+read-only and write-only capabilities, matching KVM. Production authorization
+and expected trace markers were not relaxed. Ordinary KVM service mode
+advances beyond configuration but still stops before the final receiver
+cleanup marker. The passing restart-request probe establishes a fresh
+authorized service generation; it does not execute the actual FAT32 provider
+or satisfy the live storage recovery gate. The restart fixture now separates
+its data and management endpoints. Sending requires the live sender's exact
+SIGNAL capability for the endpoint object and the exact pair of task
+generations. The fixture tests both crossed capability/peer combinations
+before sending valid requests. A successful restart installs the replacement
+task generation in the data route.
+
+The immutable image adapter now accepts canonical block-provider v1 reads from
+an authenticated runtime receive and copies only the requested bytes through
+the exact task-bound write projection. The focused test exercises a nonzero
+copy offset and denies the wrong sender, wrong receiving task, stale block
+session, and revoked projection without touching the destination. This is a
+hosted runtime test. The signed guest still needs a separate block route with
+capability release and reply delivery, plus the real FAT32 caller and its
+supervised read-restart-read sequence.
+
+The opt-in `fat32_ready_probe` launches the actual signed
+`mrml-fat32-service.efi` at CPL3. The kernel copies the one-use read-only
+launch record, verifies its capability was released, and accepts a real
+capability-free v3 Ready message only from the launch-bound task and endpoint,
+with all six identity/generation fields matching. The fixture runs with
+`tools/ci/test-native-fat32-ready-kvm.sh` on Arch WSL2 nested KVM and
+`tools/ci/test-native-fat32-ready-whp.ps1` on Windows WHP. Its first attempts
+hit the guarded stack: the pinned PE prologue polls a 0x35378-byte frame, so
+this mode uses a bounded 64-page stack with the guard retained. This proof
+stops at Ready; no storage RPC, mounted volume, supervised restart, or
+physical hardware is qualified by it.
+
+The separate opt-in `fat32_data_probe` sends mount, lookup, open, and read
+over the real signed service's v3 IPC endpoint and gets canonical v1 block
+responses from the test-only in-guest media coordinator. Its sparse immutable
+volume expands byte-for-byte to the generated FAT32 image. The probe tests
+all 28 bytes of `PROBE.TXT` and guards the output at a nonzero offset.
+Block and file copy capabilities are attenuated and revoked before the
+corresponding response is observed. The scripts `test-native-fat32-data-whp.ps1`
+and `test-native-fat32-data-kvm.sh` run the same read contract. The live probe
+exposed a 4096-byte provider workspace passed to a primitive requiring the
+mounted cluster's exact size; lookup and read now use a checked prefix of
+the workspace. This is a signed guest file-read proof only, not the
+supervised restart and stale-generation qualification gate.
+
+The separate `fat32_restart_probe` resets no VM state. The supervisor rejects
+restart until the old task is removed and its cleanup ticket is completed.
+The probe zeroes and rereads the old writable image/stack pages, unmaps the
+bounded old image and stack, and starts the verified successor in a distinct
+root. The original caller attempts IPC with the revoked endpoint leaf and
+also targets the retired task with a valid new leaf; both sends are denied.
+The native service derives disjoint mount/object and root/file generation
+ranges from its launch-bound provider epoch. The probe presents the old
+file handle both with the old mount and against the newly opened file's
+fresh mount, checks both responses are `StaleObject` with unchanged output
+and no admitted block reads, then reads the same 28 bytes through the fresh
+handle. Generation ranges fail closed; native epochs are 1 through 65,535
+and each root/file counter is bounded within that epoch.
 
 Storage modularization is now **PARTIALLY IMPLEMENTED** at its first dependency
 gate. Canonical generation-1 `storage.block-provider` and generation-2
@@ -1916,8 +2065,8 @@ Three new persistent deltas are documented before implementation:
   is **PARTIALLY IMPLEMENTED** hosted controlled-probe evidence, not a GUI app,
   general resolver/resource projection, required-system Total readiness,
   host-resistant isolation, bare metal, or physical evidence.
-  The configuration package now admits both forms and supplies a concrete
-  configuration-specific adapter with focused fail-closed tests. The native
+  The configuration package admits only microVM placement. Hosted regression
+  tests preserve evidence for the former direct lifecycle. The native
   form now uses a real accounted `TaskRuntime`/`ServiceSupervisor` launch and
   exact retryable address-space cleanup. The VMM form now has a backend-neutral
   owner that retains one prepared guest behind an exact generational endpoint
@@ -1935,7 +2084,7 @@ Three new persistent deltas are documented before implementation:
   service form, and a bounded hosted adapter carries the exact ABI-3 request
   through `TaskRuntime` plus one attenuated shared-buffer capability under
   distinct VM/task bindings on Windows and Arch Linux. This is not a launched
-  service or VMM invocation. A complete representative dual-placement service,
+  service or VMM invocation. A complete representative microVM service,
   Settings/shell projection of owner policy, VM construction, resource
   projection, resolver-to-launch binding, concrete service syscalls, and WHP/KVM
   runtime transport remain **PLANNED**. A bounded userspace receive/reply loop
@@ -1988,8 +2137,8 @@ With the small package-extension/tooling gate complete, keep adaptive isolation
 and storage/optical as separate sequential foundational OS tasks under
 the work-in-progress limit; do not combine them into one functional commit.
 
-Adaptive-isolation milestones remain separate: policy/object schema; one
-dual-placement service; one dual-placement GUI app; monitor visibility
+Total MicroVM milestones remain separate: policy/object schema; one
+microVM service; one microVM GUI app; monitor visibility
 (**PARTIALLY IMPLEMENTED** as a capability-scoped aggregate kernel snapshot);
 resource/device projection; Settings/shell policy; strict Total runtime;
 bootloader selector; EFI Shell selector; required-system Total readiness;
@@ -2855,8 +3004,7 @@ reference accounting, and process integration remain **PLANNED**.
 The canonical `org.mrml.zstd` provider and `org.mrml.zim` consumer migration are
 **PARTIALLY IMPLEMENTED** as hosted code and focused tests. ZIM depends on the
 separate ABI-3 binding package, declares the isolated-service form, and no
-longer names a provider crate or path. Zstd declares native-service or microVM
-placement and supplies a bounded service-side kernel IPC/shared-buffer adapter.
+longer names a provider crate or path. Zstd requires microVM placement and supplies a bounded service-side kernel IPC/shared-buffer adapter.
 The existing Wikipedia composition root still directly supplies the provider
 in its host build. A standalone `org.mrml.zstd` x86-64 UEFI service artifact now
 builds through `mrml` on Windows and Arch Linux with exact launch-register and
@@ -4864,7 +5012,7 @@ cannot select a different surface, output, generation, or authority. The
 binding retains exact handles and fails revalidation after revocation or slot
 reuse without replaying placement policy. This is a
 host unit-tested kernel contract, not a complete application wire path,
-trusted registry/compositor, dual-placement GUI application, GOP presentation,
+trusted registry/compositor, microVM GUI application, GOP presentation,
 fence path, Semantic Scene Graph, WHP/KVM GUI parity, or physical display
 evidence. Those steps remain in the listed dependency order.
 
@@ -4879,7 +5027,7 @@ and 535 kernel tests. Native IPC and a backend-neutral microVM queue are now
 **PARTIALLY IMPLEMENTED** with the identical fixed surface frame and common
 registry/kernel admission; eight focused compositor tests pass on Windows and
 Arch Linux/WSL. The queue is not guest-mapped or exercised through WHP/KVM;
-registry lifecycle in a running compositor and the representative dual-placement
+registry lifecycle in a running compositor and the representative microVM
 GUI application's live surface connection remain next. The new
 `org.mrml.app.gui-probe` already supplies a placement-independent client state
 machine over the interface-owned canonical frame and an independently signed

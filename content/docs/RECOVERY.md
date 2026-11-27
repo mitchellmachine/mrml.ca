@@ -75,20 +75,20 @@ into a functional commit.
 
 Read `AGENTS.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`,
 `docs/APPLICATION_PLATFORM.md`, `docs/COMPILER.md`, this file,
-`docs/ROADMAP.md`, and `docs/MICROKERNEL.md` completely. Then inspect recent
+`docs/ROADMAP.md`, and `docs/GIGAKERNEL.md` completely. Then inspect recent
 history for the affected
 subsystem. README gives repository-wide rules; ARCHITECTURE gives stable
 direction; SECURITY gives normative boundaries; APPLICATION_PLATFORM gives the
 native/VM/browser/GUI/AI contract; COMPILER gives the future-Rust compatibility,
 analysis, profile, and oracle direction; ROADMAP gives dependency order;
-MICROKERNEL is the detailed dated evidence ledger. Source and tests decide
+GIGAKERNEL.md is the detailed dated evidence ledger. Source and tests decide
 whether a stated item actually exists.
 
 If documents disagree, prefer in this order for factual implementation status:
 
 1. current source plus tests and executable evidence;
 2. newer relevant commits and their diffs;
-3. dated MICROKERNEL evidence;
+3. dated Gigakernel evidence;
 4. ROADMAP status;
 5. overview prose.
 
@@ -1007,12 +1007,11 @@ optical, and total-microVM claim until exact implementation and evidence exist.
 Total MicroVM is strict: a failed eligible microVM launch makes that component
 unavailable and never silently boots or launches it natively. Recovery remains a
 separate small audited environment so it can repair persistent isolation policy,
-the VMM, and guest-runtime generations even when Total mode cannot start. A
-repeated failed persistent Total request may offer an explicit Balanced-once or
-Recovery choice, but must not mutate persistent policy automatically; authorized
-recovery policy changes are recorded where audit support exists.
+the VMM, and guest-runtime generations even when Total mode cannot start. A failed normal boot may offer an explicit retry or entry into Recovery. Neither
+choice enables native userspace fallback or mutates persistent policy
+automatically; authorized recovery changes are recorded where audit support exists.
 
-The UEFI library's bounded LoadOptions parser now recognizes the configured
+Historical compatibility evidence: the UEFI library's bounded LoadOptions parser recognizes the configured
 default or exact one-boot Total request identically for boot-entry optional data
 and an exact `BOOTX64.EFI` shell invocation. The loader now validates the
 firmware-owned buffer and carries `TotalMicrovmOnce` in the canonical handoff;
@@ -1986,10 +1985,31 @@ target objects and exact target capability generations. A second-map failure
 rolls back the first reservation and object charge before recovery can publish
 either domain. WHP/KVM now retain one host page while mapping it into both exact
 GPAs and remove both mappings before ledger retirement. Nested KVM proved this
-across two live VMs. This nested WHP environment rejects a second simultaneous
-partition with a typed VID collision; recovery must report Total placement
-unavailable and never reuse one partition. Guest page-table projection,
-translation invalidation, queue activation, and recovered execution remain.
+across two live VMs. On the tested Windows host, WHP rejects the second
+simultaneous guest's GPA mapping in the same process with a typed VID collision.
+A separate-process WHP diagnostic runs both signed guests without reusing a
+partition. The
+fixture duplicates only its anonymous, one-page RW/NX section into the exact
+child it spawned, after rechecking the shared object's authority and both
+exact live target capabilities and one-page RW/NX ledger reservations. A
+fixed-size private-pipe frame binds the child-local handle
+to the expected signed provider payload digest before mapping. Both guest and
+native mappings are withdrawn before the parent atomically retires both
+ledger reservations and reclaims the page charge. An endpoint for the old
+page cannot initialize a replacement at the same guest addresses. The worker
+loss fixture exits without Rust teardown after the signed provider writes
+scratch data, while the read is still pending. The parent observes exact
+process exit, does not publish a read response, checks its local alias is
+withdrawn, and reclaims the reservation. Without resetting the parent's
+ledger, the fixture starts a new worker and guest with fresh page and binding
+generations at the same guest addresses. The old endpoint cannot submit on the
+replacement; the fresh pair completes the 512-byte retry. The reusable READ
+adapter accepts one replacement per retired binding only with an exact typed
+retirement receipt, live page reservations in the same ledger namespace, and
+advancing provider, binding, and session generations. It
+launches no workers and does not auto-replay I/O. No durable writes are
+involved. This is test-only evidence, not worker
+attestation, an installed storage service, or recovered Total placement.
 
 Recovery's retained peer owner now also installs and verifies the two exact
 supervisor RW/NX guest leaves before use. It removes and verifies both leaves
@@ -2000,7 +2020,11 @@ is translation lifecycle evidence, not recovered component queue execution.
 The retained peer page now also admits one bounded generation-bound interface
 request/response slot. Recovery cannot infer authority from its bytes: every
 transition revalidates both exact target capabilities and the retained projection
-identity. Nested KVM proves the wire across two live mappings, including response
+identity. Queue endpoints and interrupt notifications also bind the memory
+ledger namespace, so matching slots and generations in another ledger do not
+permit request, response, or interrupt delivery. Once the exact page is retired,
+its receipt permanently closes both interrupt routes and discards queued
+notifications. This does not withdraw interrupts already delivered to a vCPU. Nested KVM proves the wire across two live mappings, including response
 return before leaf/GPA/ledger retirement. Recovery has not yet launched signed
 ZIM and Zstd guests to execute this queue.
 
@@ -2118,17 +2142,15 @@ and must wait or be split.
 
 ## 5. Verify and report
 
-Use the README's current platform-testing policy. Local native Windows and
-Windows VMM/WHP testing are suspended for now: Codex must not attempt WHP,
-WHPX, Hyper-V, VBS, or other Windows VMM tests from the Wine environment. The
-Windows-target gnullvm toolchain is currently exercised locally only under Wine;
-label that result as Wine-hosted toolchain coverage, never native Windows,
-Windows ABI, WHP, VBS, or hardware evidence. Preserve the configured native
-Windows and WHP GitHub Actions gates; when a GitHub-hosted job passes, record it
-as current native evidence only for what that job actually exercised. Earlier
-dated Windows/WHP entries remain historical evidence. Run focused Linux tests
-first, then the strongest relevant supported platform-independent and Linux/KVM
-suites. Record exact commands, toolchain, backend, artifact versions,
+Use [Project status](PROJECT_STATUS.md) for the current workspace and test
+scope. Native Windows gnullvm runtime and compiler tests are recorded in the
+[compiler checkpoint](compiler/CHECKPOINT.md). For WHP, Hyper-V, or VBS, test on
+native Windows with the required features and record the exact backend. Wine
+runs record toolchain coverage, not native Windows or hardware evidence. This checkout has no tracked GitHub
+Actions workflow. Attribute a CI result only to the revision, runner and checks
+that actually ran. Earlier dated Windows/WHP entries remain historical evidence.
+Run focused Linux tests first, then the strongest relevant supported
+platform-independent and Linux/KVM suites. Record exact commands, toolchain, backend, artifact versions,
 configuration, outcomes, and benchmark boundaries. Label evidence as unit test,
 simulated, Wine-hosted toolchain, GitHub-hosted native Windows, QEMU TCG,
 hosted/nested KVM, or physical hardware.

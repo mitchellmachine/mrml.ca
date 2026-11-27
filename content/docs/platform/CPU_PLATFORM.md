@@ -2,7 +2,7 @@
 
 **Status: PLANNED**, except for the existing x86_64 discovery, SMP, APIC,
 scheduler, VMX/EPT, measured-boot, bounded CPU-budget groundwork, and hosted-probe mechanisms recorded in
-[`../MICROKERNEL.md`](../MICROKERNEL.md). This document defines future policy;
+[`../GIGAKERNEL.md`](../GIGAKERNEL.md). This document defines future policy;
 it does not claim microcode loading, complete vulnerability evaluation, physical
 hardware support, power control, sensor service, or thermal protection exists.
 

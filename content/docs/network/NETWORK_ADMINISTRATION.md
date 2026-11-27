@@ -15,7 +15,7 @@ automation, and capability-scoped AI use the exact same objects/services. Human
 text and visual cards are views, never the configuration protocol.
 
 Names, MAC/BSSID, SSID, device IDs, and discovery are identity/data, not authority.
-Native applications normally receive bounded connections rather than system
+Ordinary applications in admitted microVMs receive bounded connections rather than system
 configuration. Configuration, connection use, raw packets, promiscuous capture,
 injection, monitoring, secrets, and device reset are separately authorized.
 

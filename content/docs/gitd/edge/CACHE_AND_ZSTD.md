@@ -40,7 +40,8 @@ not a level-22-equivalence profile. It constructs bounded forward and RFC
 reverse bitstreams, serializes RFC normalized counts, inverts FSE decode tables
 into deterministic compression paths, encodes three interleaved predefined FSE
 sequence states, and uses a fixed-memory match finder. Each block chooses raw,
-RLE, or the predefined-FSE compressed candidate by exact encoded payload size.
+RLE, or a supported compressed candidate by encoded payload size. Predefined
+FSE sequence tables are one candidate, not the only compressed encoding.
 The persistent-record magic and compressed-representation ETag domain are
 versioned with that selection. Linux and Windows/Wine focused suites exercise
 determinism, compressed selection, decode round trips, cache hits, and all HTTP

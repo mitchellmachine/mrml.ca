@@ -1,7 +1,7 @@
 # MRML operating-system architecture
 
 This is the durable architectural overview. Detailed implementation history and
-probe evidence remain in [MICROKERNEL.md](MICROKERNEL.md); security boundaries
+probe evidence remain in [GIGAKERNEL.md](GIGAKERNEL.md); security boundaries
 are normative in [SECURITY.md](SECURITY.md); dependency order is in
 [ROADMAP.md](ROADMAP.md); the application contract is in
 [APPLICATION_PLATFORM.md](APPLICATION_PLATFORM.md); context-loss recovery is in
@@ -39,9 +39,12 @@ MRML is the **Mitchell Renouf Machine Learning Library**. It began as local
 machine-learning and inference work and is evolving into a broader experimental
 computing stack, including an operating system built from first principles.
 The OS direction is experimental, security-oriented, capability-based,
-microkernel-oriented, Rust-first, local-first, dependency-minimized, designed
-for user sovereignty, and intended to make local AI a first-class system
-capability. MRML is not currently a production operating system.
+and centered on strict Total MicroVM isolation. x86-64 is the primary
+bring-up target. Windows and Linux host tools are separate from MRML OS
+execution. macOS host support and ARM64 (AArch64) support are planned.
+The project is Rust-first, local-first,
+minimizes dependencies, and is designed for user sovereignty and first-class
+local AI. MRML is not currently a production operating system.
 
 ## Current architecture
 
@@ -51,8 +54,9 @@ capability. MRML is not currently a production operating system.
 Policy, capability derivation, exact-generation resolution, admission, resource
 accounting, queue creation, mapping, and revocation setup belong to control
 planes. After that control plane has established an immutable bounded binding,
-steady-state data should use the most direct safe transport for that binding,
-such as an in-process call, native IPC, or a capability-bound shared queue. A
+steady-state data should use the most direct safe transport for that binding.
+Ordinary cross-domain traffic uses the admitted microVM transport, such as a
+capability-bound shared queue. A
 short data path never means ambient authority: data-plane bytes cannot mint
 capabilities, select or substitute objects or providers, change placement or
 policy, exceed admitted budgets, or bypass validation, accounting, lifecycle,
@@ -168,13 +172,13 @@ quantitative CPU authority, power, telemetry, and thermal policy are canonical
 in [platform/CPU_PLATFORM.md](platform/CPU_PLATFORM.md). Those mechanisms are
 **PLANNED** unless the implementation/evidence ledger below says otherwise.
 
-**IMPLEMENTED:** an experimental x86_64 PE32+ microkernel, original UEFI loader,
+**IMPLEMENTED:** an experimental x86_64 PE32+ Gigakernel, original UEFI loader,
 bounded firmware handoff and allocator, W^X page tables, GDT/IDT/TSS, guarded
 privilege stacks, CPL3 domains, APIC timer preemption, SMP startup, IPIs,
 scheduling and migration, fixed-capacity generational capabilities and tasks,
 bounded IPC, fault retirement, service restart policy, guest-memory policy, and
 native KVM and Windows WHP launch backends. Signed controlled probes exercise
-subsets of these mechanisms. See the evidence ledger in MICROKERNEL.md.
+subsets of these mechanisms. See the evidence ledger in GIGAKERNEL.md.
 
 **PARTIALLY IMPLEMENTED:** blocking receive and scheduler wakeup, bounded
 backpressure, attenuated capability transfer with bounded transitive IPC-handle
@@ -333,7 +337,7 @@ application microVM projection; trusted compositor and semantic GUI; a no-JIT
 browser; production shared-memory queues; TPM-backed rollback state; complete
 physical VT-d/device-reset validation; recovery and release key rotation.
 
-Adaptive placement and strict Total MicroVM semantics are canonical in
+Total MicroVM is MRML’s only operating mode. Its semantics are canonical in
 [ISOLATION_PLACEMENT.md](ISOLATION_PLACEMENT.md). Total is a claim about effective
 runtime placement, not merely configuration: every running eligible userspace
 domain is in an admitted microVM, failures never trigger automatic native
@@ -396,9 +400,11 @@ separate from the stricter admission profile planned for ordinary native
 applications. The detailed feature matrix, prerequisites, priority policy, and
 oracle procedure are normative in [COMPILER.md](COMPILER.md).
 
-## The microkernel boundary
+## The Gigakernel boundary
 
-The microkernel contains only mechanisms that fundamentally require privileged
+The MRML Gigakernel is the privileged core of Total MicroVM isolation.
+
+The Gigakernel contains only mechanisms that fundamentally require privileged
 execution: address-space isolation, scheduling, IPC primitives, capability
 enforcement and transfer/revocation primitives, interrupt routing, fundamental
 memory ownership, minimal hardware isolation, and mechanisms needed to prevent
@@ -411,6 +417,25 @@ ordinary drivers where feasible, and AI policy belong in isolated userspace
 services. A service failure should revoke its authority and resources, notify
 affected peers, permit bounded restart, and leave unrelated services and the
 kernel running.
+
+UEFI selects the boot display mode and passes validated scanout geometry.
+Normal kernel boot does not paint the framebuffer. Post-boot drawing belongs
+to the compositor, using a scoped output grant and a bounded scanout view
+rather than a physical address. For microVM placement, the guest renders
+into its own frame; the trusted output projection copies only visible pixels
+and never lends the hardware mapping to the guest. The projection checks the
+exact committed microVM launch against the admission table again before it
+requests the guest’s frame. A retired route cannot regain access when its slot
+is reused. This is tested control-plane wiring, not live guest execution. Explicit firmware recovery and bring-up diagnostics do not
+constitute a parallel production display implementation.
+
+Native USB has no privileged runtime fallback. The kernel may retain device
+quiescence, requester isolation, and capability binding and revocation. USB
+controller operation and mass-storage commands belong to one isolated block
+provider; FAT32 remains a separate service using the block protocol. Firmware
+reads of boot artifacts and read-only bring-up inspection do not constitute
+native driver ownership. Until the isolated USB provider can be provisioned,
+native USB I/O is unavailable rather than routed through privileged code.
 
 Storage's modular provider boundary is **PARTIALLY IMPLEMENTED** at the stable
 interface-schema layer. Block transports and filesystems are immutable library
@@ -1460,7 +1485,7 @@ secrets, power, and restart policy are canonical in
 [network/NETWORK_ADMINISTRATION.md](network/NETWORK_ADMINISTRATION.md). All are
 **PLANNED** unless exact code/tests below establish otherwise.
 
-**PLANNED:** networking remains a userspace service for native applications,
+**PLANNED:** networking remains a userspace service for applications in admitted microVMs,
 which request bounded connection objects instead of raw packets. A VM receives
 a VirtIO-net-compatible or MRML virtual NIC only with explicit authority such as
 none, isolated, outbound-only, specifically routed, bridged, or raw access.
@@ -1514,7 +1539,7 @@ The existing semantic system monitor is the single **PLANNED** observer for
 authorized task, resource, integrity, device, platform-security, and recovery
 state. Its canonical model is in
 [monitor/SYSTEM_MONITOR.md](monitor/SYSTEM_MONITOR.md); monitoring does not join
-the microkernel or replace supervision, policy, or owning services.
+the Gigakernel or replace supervision, policy, or owning services.
 
 The capability-native authority broker will evaluate narrow requests and may
 deny, allow, request trusted user consent, grant once, grant until process exit,
@@ -1653,8 +1678,8 @@ Local AI is eventually exposed as a capability such as
 discipline as all software: **AI-native does not mean AI-privileged**.
 
 The application platform does not inherit POSIX/C as its foundational ABI.
-Ordinary native applications are intended to be admitted as memory-safe code
-using a safe SDK over stable service protocols. Unsafe/legacy applications live
+Ordinary MRML applications are intended to run as memory-safe code in admitted
+microVMs, using a safe SDK over stable service protocols. Unsafe/legacy applications live
 behind explicit VM compatibility boundaries. The trusted compositor, semantic
 scene graph, HiDPI coordinate model, browser rules, and AI interaction boundary
 are specified in [APPLICATION_PLATFORM.md](APPLICATION_PLATFORM.md). None is

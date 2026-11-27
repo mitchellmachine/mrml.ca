@@ -121,8 +121,8 @@ authorized multimodal inspection rather than false textual equivalence.
 
 ## Memory safety and containment
 
-Ordinary native applications are memory-safe by admission policy, with safe
-Rust as the primary direction. The language's support for unsafe systems work
+Ordinary MRML applications run in admitted microVMs and are memory-safe by
+admission policy, with safe Rust as the primary direction. The language's support for unsafe systems work
 does not authorize ordinary applications to use unsafe code. Unsafe Rust is
 reserved for system components where justified and audited. Memory-unsafe
 legacy software belongs behind explicit compatibility/isolation boundaries,

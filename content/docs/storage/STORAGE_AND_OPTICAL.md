@@ -2861,6 +2861,623 @@ the deployment transaction: create GPT, ESP and MRML partitions, format, deploy
 an authenticated `.mrz`/`SystemRelease` package graph, flush, reread, and verify.
 Writing an image to a physical disk is never modeled as an authorized blind copy.
 
+## Native USB mass-storage bring-up
+
+**PARTIALLY IMPLEMENTED.** The USB storage library identifies an unambiguous
+SCSI transparent Bulk-Only Transport interface and validates command tags,
+transfer lengths, status and capacity. Its current contract is one 512-byte
+sector on LUN 0. A write succeeds only after WRITE(10), SYNCHRONIZE CACHE(10),
+and matching READ(10). Transport errors, short transfers, invalid status and
+readback mismatches fault the session; no uncertain write is retried. This
+is a protocol implementation tested against scripted bulk transfers, not
+a storage provider exposed to applications.
+
+FAT32 has a separate fixed-size data update primitive for an existing file
+occupying one 512-byte sector. It checks the expected previous bytes and
+preserves sector slack; it cannot create, resize, allocate or modify FAT or
+directory metadata. Its caller must prove exclusive partition access and
+validate the file extent, including absence of aliases. It is not exposed by
+the read-only FAT32 service.
+
+The polled xHCI controller engine validates MMIO and DMA ranges, initializes
+command/event rings, and addresses one direct USB 2 High-Speed or USB 3
+SuperSpeed device. It reads descriptors on endpoint zero, binds one
+configuration with a single Bulk-Only Transport interface, and makes exact,
+bounded bulk transfers. The two bulk endpoint rings recycle with Link TRBs
+and independent cycle bits, only after exact, successful transfer completion
+and connection revalidation. The Linux host QEMU qtest links the public USB
+and FAT32 libraries without adding a dependency between them. In both emulated
+USB modes, the fixture reads the partition table, FAT32 boot sector, directory,
+and mirrored FAT entries through the xHCI disk. It rejects a stale expected
+payload and performs repeated fixed-file overwrites across bulk and event ring
+wraps. The host compares the entire persisted image against its expected bytes:
+only the three payload bytes in `PROBE.TXT` differ. Sector slack, partition
+and FAT32 metadata, and the rest of the disk stay unchanged. After confirmed
+emulated unplug, the old session rejects a write at the port check and latches
+the fault for later operations. This covers removal between requests, not
+mid-transfer removal, recovery, hardware speed, power-loss durability, or
+certification.
+
+Run the opt-in fixture on Linux with QEMU installed from the repository root:
+
+```bash
+./target/debug/mrml test org.mrml.test.usb-fat32-qtest --target linux
+./target/mrml-native/linux/debug/mrml_usb_fat32_qtest_tests --ignored
+```
+
+The partition bounds and exclusivity in this test are supplied by its private
+synthetic image, not by a native storage authority. The probe now compares the
+complete provisioned FAT32 metadata (the reserved area, both FAT copies and
+the one-sector root) before authorizing the bounded file update locally. It
+checks the expected provisioned volume serial and rejects altered metadata,
+including a second root entry or an unexpected FAT link, without issuing a
+write. The serial is not permission to write: this operation still requires
+an exclusive, generation-bound partition view. An uncertain result closes
+the view rather than retrying. This path does not create a file on an
+arbitrary FAT32 volume or expose a general sector-write RPC.
+
+The USB provider now has a separate diagnostic partition endpoint. It accepts
+only a supervisor-supplied partition capability with read/write rights, a
+matching live session and media generation, and the exact in-range partition
+from a single inactive FAT32 MBR entry. It allows relative reads inside that
+partition and a canonical 512-byte write on its own partition session (not
+on the disk's read session), only to the supervisor-selected file
+sector. The FAT32 test layer still verifies the full fixture and constrains
+the update to the three marker bytes. Revocation or replacement of the
+partition capability prevents further I/O; an uncertain write withdraws the
+USB session and is not retried. The USB 2/3 QEMU fixture exercises this
+endpoint and checks the entire persisted image. It also tests a wrong media
+generation, a substituted or read-only capability, a different extent, a
+stale session and an attempt to write metadata. In the USB 3 case it tests
+unplug before the write and verifies that the old session is retired. The
+test capability is modeled in the running host fixture, not transferred to
+an executing USB service MicroVM. Normal enumeration remains read-only.
+A separate write adapter now carries one canonical request and its copied
+512-byte input on the existing generation-bound MicroVM queue. The provider
+owns the diagnostic partition and enforces the exact write sector after queue
+validation. It rejects a replayed notification and closes the endpoint if
+an accepted operation cannot publish its reply; missing completion is not
+permission to retry. The QEMU test sends the marker updates through this
+queue and checks the persisted disk. It rejects an earlier completion and
+refuses further writes through that consumer. The peers in this test are synthetic:
+it does not launch the USB provider in a MicroVM or map hardware DMA.
+
+A separate KVM diagnostic now maps a shared page into two independently
+signed guests. One changes the three marker bytes in the submitted USB write
+request and the other observes the exact successful completion through its
+own mapping. The real USB queue and BOT disk code run in the hosted test
+harness with a synthetic backing sector; the fixture requires a cache flush
+before readback and checks the untouched sector bytes. Run
+`mrml test org.mrml.system.vmm-kvm --target linux` and then
+`target/mrml-native/linux/debug/mrml_kvm_tests --ignored --nocapture live_kvm_guest_supplies_usb_write_payload`
+on a Linux host with KVM. The live guest test and the QEMU/xHCI FAT32 test
+are distinct: the KVM test does not put the USB driver inside a guest or
+access physical flash media.
+
+The separate `usb-guest-probe` fixture builds a freestanding Rust image that
+executes the FAT32 update and USB BOT/SCSI code inside a signed KVM guest.
+The guest verifies the preallocated `PROBE.TXT`, updates `old` to `new`,
+requires cache flush before readback, and verifies the untouched sector bytes.
+Only the result byte crosses the checked, non-executable peer page, which the
+launcher retires after the test. To reproduce this guest-only test, run
+`mrml build org.mrml.test.usb-guest-probe --target native --release`, then
+`mrml test org.mrml.system.vmm-kvm --target linux`. Set `MRML_USB_GUEST_PROBE`
+to the resulting `mrml-usb-guest-probe.efi` under
+`target/mrml-native/mrml_native-x86_64-unknown-uefi/release/` and invoke the
+same test binary with `--ignored --nocapture live_kvm_guest_executes_usb_write_probe`.
+That mode uses a synthetic medium in guest memory.
+
+For external persistence, use the same image and run
+`--ignored --nocapture live_kvm_guest_writes_qemu_usb_disk` instead. A second
+mode of the signed MicroVM runs the same BOT/SCSI and FAT32 code over a
+one-page test mailbox. The host forwards bounded, phase-checked bulk transfers
+to QEMU's xHCI USB 2 and USB 3 endpoints. Only the declared fixture sector and
+the exact three-byte update are admitted. The test observes successful cache
+flush and readback, removes the disk, revokes the emulated controller, and
+compares the entire raw image against the expected bytes. The xHCI register
+and DMA transport still resides in the hosted QEMU fixture, not inside the
+MicroVM. Neither mode verifies an installed VMX/VT-d device assignment or a
+physical Chromebook write.
+
+The signed guest also has a distinct read-only controller preflight mode:
+`--ignored --nocapture live_kvm_guest_preflights_qemu_xhci`. It reads the
+emulated capability header and walks the legacy ownership chain using the
+guest-side xHCI platform adapter. The fixture permits only the discovered
+capability dwords and one four-byte scratch marker in projected DMA RAM. The
+host verifies readback and unchanged adjacent bytes, scrubs the marker, checks
+that PCI bus mastering stayed off, and compares the unmodified disk image.
+The scratch transaction tests guest access to emulated DMA backing, not a
+device-initiated DMA transfer. This mode cannot reset or start a controller
+and does not authorize writes to physical storage.
+
+Run `--ignored --nocapture live_kvm_guest_commands_and_retires_qemu_xhci`
+to exercise the next stage. The signed MicroVM runs the existing xHCI driver
+to initialize fixed queues, submit one No-op Command, consume the exact
+controller-written completion, and stop. A test-only host broker retains
+the PCI assignment; it checks activation, admits only the required register
+values and queue operations, and verifies halt before disabling bus mastering.
+It independently verifies the completion before scrubbing the queues, denies
+further guest access, and checks that the disposable image was unchanged.
+The QEMU controller performs the DMA in its emulated RAM; this is not
+physical DMA isolation or an installed VMX/VT-d lease. The command diagnostic
+does not address the USB device or issue storage commands.
+
+Run `--ignored --nocapture live_kvm_guest_enumerates_qemu_usb_device` to
+extend that diagnostic to one directly connected emulated device. The guest
+selects the connected port, enables and addresses one slot, and reads the
+18-byte device descriptor over endpoint zero. The test broker accepts only
+the assigned port, exact context pointers, and the single standard
+GET_DESCRIPTOR transfer. After halt and revocation, the host checks the
+address and transfer completions and the descriptor independently, scrubs the
+queues and contexts, and compares the untouched image. This is enumeration,
+not a guest-controlled bulk storage read or write.
+
+`--ignored --nocapture live_kvm_guest_configures_qemu_usb_bulk_endpoints`
+runs the next stage. The guest reads the configuration header and the full
+descriptor, configures the descriptor-selected bulk endpoints, and issues
+SET_CONFIGURATION. Before permitting endpoint configuration the broker compares
+the full input context against the exact discovered device and assigned ring
+addresses. After retirement the host checks the descriptor, command and
+control-transfer completions, confirms both bulk rings stayed empty, and
+verifies an unchanged image. This mode issues no bulk transfer or SCSI command.
+
+The next diagnostic, `--ignored --nocapture live_kvm_guest_reads_qemu_usb_sector`,
+uses the signed guest's own xHCI bulk rings to run BOT/SCSI READ CAPACITY and
+READ(10) for the one provisioned fixture sector. The broker accepts only the
+exact read-only sequence, including one REQUEST SENSE and retry if QEMU
+reports reset-related unit attention. It checks the returned capacity, the
+sector bytes, and matching status tags. After verified halt, withdrawal,
+and scrubbing, the complete external disk image must still match. Unlike the
+earlier hosted xHCI write relay, this exercises bulk transfer and storage
+protocols together inside the guest. It does not exercise an in-guest write
+or qualify physical hardware.
+
+`--ignored --nocapture live_kvm_guest_writes_through_qemu_xhci` uses those
+same guest-driven endpoints to test a single update to the provisioned
+`PROBE.TXT` data sector. Before authorizing a single WRITE(10), the test
+broker verifies the original 512 bytes and exact target. It admits only the
+three-byte marker change, requires successful SYNCHRONIZE CACHE and full
+sector readback, and retires the controller and scrubs its queues. After
+QEMU confirms removal, the host independently compares the entire image:
+only the three expected file bytes may differ. This is a fixed-sector QEMU
+diagnostic, not a general FAT32 writer or a verified Chromebook write.
+
+Patent review: NOT_TRIGGERED; this is exact fixture comparison and scoped
+dispatch using the existing FAT32, capability and USB mechanisms. See
+[review log](../patents/REVIEW_LOG.md).
+
+The xHCI lifecycle now retains the original assignment on untouched startup
+failure, and a shutdown-only owner after partially programmed startup or
+uncertain halt. Confirming a halt consumes the live controller and exposes
+only revocation, not another I/O session. Revocation failure retains the same
+owner for retry. Its backend contract requires disabling bus mastering,
+revoking and invalidating DMA, scrubbing reusable memory, and withdrawing the
+exact MMIO mapping; abandoned live or uncertain assignments must quarantine.
+The QEMU fixture verifies the halt and PCI command-bit readback for the
+emulated function only. Tests with a synthetic backend cover an uncertain
+start write, halt timeout, and failed revocation. This does not prove physical
+DMA isolation or implement the native assignment backend.
+
+The xHCI PCI admission check compares a fresh snapshot with an expected
+controller descriptor: segment/bus/device/function, configuration generation,
+vendor/device and class/revision, header, and BAR0 base, type, and size.
+It admits aligned, non-prefetchable 32- or 64-bit memory BARs and rejects an
+already enabled bus master. The QEMU fixture sizes, restores and reads back
+its own synthetic BAR, exercises a stale-generation rejection while bus
+mastering is off, and passes the validated size to the controller. These
+checks do not grant rights or establish an exclusive assignment. Native
+activation must hold the same assignment lock from revalidation through
+mapping and bus-master enable, with IOMMU isolation installed first.
+
+The PCI startup path now verifies the exact backend-reported DMA mapping
+generation and bounds before touching the controller. It retains those bounds
+for the initial queues, device contexts, control transfers, and bulk buffers.
+The controller resets with bus mastering off, publishes isolated queue memory,
+revalidates the assignment, and requires exact PCI command readback before
+programming DMA pointers or starting the controller. Failure after programming
+begins returns the existing shutdown-only owner. Scripted tests reject a
+mapping change during startup or an unchanged PCI command after enabling.
+QEMU checks the halted/reset state at bus-master enable, rejects out-of-range
+DMA, and runs the existing FAT32 test using its synthetic guest aperture.
+This is ordering and bounds evidence, not physical IOMMU enforcement.
+
+For Intel VT-d, the kernel now resolves PCI sub-hierarchy entries in the
+firmware DMAR table to the named bridge and its downstream bus window, rather
+than falling back to the segment default for a downstream xHCI requester.
+It checks nested bridge windows against their parents, excludes interrupt-only
+entries from PCI DMA routing, and rejects ambiguous matches and unsupported
+ACPI namespace scopes rather than guessing. This is read-only routing evidence
+and does not establish device isolation, requester-alias safety, or DMA
+authority.
+
+The DMAR parser also retains firmware Reserved Memory Region Reporting
+(RMRR) extents and their PCI scopes. The bounded assignment route refuses
+requesters covered by such an extent instead of silently omitting required
+firmware memory mappings or granting them implicitly. An unrelated
+requester can still be routed. This does not establish which RMRRs, if any,
+the running Dragonair firmware reports.
+
+The verified VT-d unit can now check a contiguous DMA aperture against its
+active legacy root, exact requester and expected hardware domain. It checks
+every 4 KiB page in the bounded aperture against the expected physical backing,
+including non-identity mappings, and intersects read/write permissions along
+the walk. A stale root, wrong unit, missing page, unexpected backing, or
+read-only ancestor cannot pass. This is a read-only check over existing
+mappings; it does not install or lock them, invalidate caches, or prove
+requester-alias isolation. The supervisor-facing xHCI VT-d startup entry
+point matches the route to the exact PCI location and invokes this verifier
+before programming, immediately before bus-master enable, and after PCI
+readback before queue-register writes or RUN. Tests inject failure at each
+gate. The trusted backend must still construct and retain the live
+assignment, pin and synchronize the tables, and implement withdrawal.
+The QEMU FAT32 fixture still uses synthetic guest DMA, not this physical
+VT-d path.
+
+The kernel now provides a bounded withdrawal operation for an existing
+legacy VT-d aperture. It verifies the entire window before editing, clears
+only the matched leaves' DMA permission bits, and requires context-cache
+and IOTLB invalidation with DMA reads and writes drained. The current
+profile requires coherent table walks and register-based invalidation.
+The context-cache and IOTLB registers use their distinct global request
+encodings, and both must report global completion.
+A late failure leaves the original pages quarantined; the exact aperture
+can be retried because denied entries retain their backing addresses.
+The operation does not stop the device, disable ATS, establish ownership,
+scrub memory, or release pins. The native backend must supply those steps
+and wire installation and withdrawal to the xHCI assignment lifecycle.
+
+The kernel can also populate a bounded, existing legacy VT-d hierarchy while
+PCI bus mastering is off. Installation validates all destinations up front
+and accepts only zero entries; denied entries that retain prior backing are
+not free slots. Success requires a confirmed draining invalidation. A failed
+publication clears only the prefix it wrote and requires a second successful
+invalidation before it reports rollback. If that cannot be confirmed, the
+backing must remain quarantined. This does not issue native PCI assignments,
+reclaim revoked slots, or arm a controller. A separate builder can prepare a
+six-page inactive legacy root for one exact requester and a window within
+one 2 MiB span. Its DMA leaves and all other requester contexts start absent.
+The boot owner still has to allocate/pin these table pages separately from
+device memory, quiesce all requesters using the remapping unit, and establish
+that installing the root is safe before activating it.
+
+The supervisor-side xHCI adapter now composes installation, activation
+verification and withdrawal for a preallocated Intel VT-d assignment. It
+matches PCI location and DMA extent, installs only with xHCI halted and bus
+mastering disabled, and confines register and DMA access to the assigned
+ranges. Shutdown confirms halt and bus-master disable before withdrawing
+the exact aperture, then asks the owner to scrub and release. If release
+fails after draining, retry does not reprogram the device or IOMMU.
+Tests inject an unchanged PCI command, uncertain withdrawal, and failed
+final release. A concrete native owner must still issue PCI assignments,
+allocate/pin resources, and implement quarantine and final release; the
+adapter is not called from native boot.
+
+The native PCI owner adapter now accepts only an exact device control
+capability and separate DMA memory rights. The trusted lease must match
+the PCI, BAR, allocation and DMA generations and the complete VT-d
+aperture, including physical backing and hardware domain. It samples
+configuration space through the lease and changes only the bus-master
+bit using a command-width write after checking the live identity. The
+adapter does not implement the allocator or pin/unpin itself. The kernel
+ECAM adapter now provides the 16-bit bus-master toggle with exact command
+readback for a supervisor holding the writable function's exclusive lease.
+Its memory-backed test covers stale command rejection, range checking and
+preservation of adjacent PCI Status. The native xHCI lease composes this
+writer with a pinned backing provider, confines ECAM reads and Command
+changes to the one bound requester, and rejects further access after
+release. Memory-backed tests verify that another populated PCI function
+is untouched. The native kernel still has to issue and retain that pinned
+backing and ECAM mapping through boot, shutdown and hot removal. No
+physical ECAM was accessed by the tests.
+
+The early kernel allocator can reserve up to 256 physically contiguous DMA
+pages from validated free RAM, excluding physical page zero and honoring the
+verified host address width supplied by the caller. The allocator is
+monotonic: dropping the reservation does not put pages back into circulation.
+This is a boot-lifetime reservation, not a runtime pin or a device mapping.
+The inactive page-table builder can install an exact supervisor RW/NX
+mapping and retain the reservation in a root-bound handle. It preflights the
+entire virtual range and removes newly installed leaves on a recoverable
+failure; an uncertain rollback requires discarding that inactive hierarchy.
+After activation, the initializer consumes the handle, rechecks the root and
+every 4 KiB leaf, then clears the exact reservation. These checks do not
+establish alias exclusion, cache type or DMA coherency. The live boot path
+cannot yet activate native xHCI. The opt-in `boot_dma_probe` UEFI loader
+profile requests 16 contiguous LoaderData pages below 4 GiB, maps them
+supervisor RW/NX at a dedicated virtual address, and validates the exact
+allocation in the raw final firmware map. It then tags that range after
+framebuffer overlay; neighboring ranges keep their original classification.
+The kernel handoff accepts one bounded DMA tag, and the allocator does not
+treat that range as free. Normal loader profiles do not emit the tag.
+On the paired diagnostic kernel, before AP startup, verify every active
+4 KiB mapping, clear the loader's nonzero pattern, and read back the
+complete range before reporting success. To run the signed, disposable-image
+regression, use `mrml usb test-dma OVMF_CODE OVMF_VARS QEMU`. Its trace
+requires a dedicated DMA handoff success byte before the embedded FAT32
+restart trace. This exercises the CPU mapping, not controller DMA. It
+does not issue device capabilities, write PCI configuration or touch
+physical media.
+
+The opt-in loader also copies the unique DMAR and MCFG ACPI tables when
+both exist. The kernel validates the bounded snapshots and their topology
+before reporting success; an absent pair carries no DMA authority.
+`mrml usb test-dma-acpi OVMF_CODE OVMF_VARS QEMU` checks the ACPI handoff
+with QEMU's Intel IOMMU. After parsing the tables, the probe reports whether
+the normalized handoff map covers every DRHD bootstrap page and full ECAM
+window as MMIO. On the tested q35/OVMF image it reports missing coverage
+(`d7` after `d5`), so ACPI discovery alone does not justify mapping the
+registers. The `test-dma` companion omits the IOMMU and expects neither
+marker. Neither boot installs device mappings, accesses PCI or DRHD
+registers, or activates DMA for the MRML xHCI driver.
+
+The UEFI library has a boot-only, read-only
+[DXE resource query](https://uefi.org/specs/PI/1.8/V2_Services_DXE_Services.html#getmemoryspacedescriptor)
+for the next discovery step. It checks the declared table signature, size,
+revision, CRC and query slot, then requires explicit MMIO with uncacheable
+capability across the whole requested range. It rejects holes, overlaps,
+non-MMIO descriptors and excessive fragmentation. The opt-in loader checks
+the DXE table and function address against a fresh bounded boot memory map,
+then queries each DRHD bootstrap page and each complete ECAM window. The
+QEMU q35/OVMF fixture returned no positive uncacheable MMIO classification
+for either window (one DRHD, one ECAM; trace `e1f1`). This is observational
+only: it does not change the firmware resource map, issue mapping authority,
+prove CPU cache attributes, confer ownership or read device registers.
+
+In the separate host-side QEMU fixture, `test-dma-acpi` pauses that same
+emulated machine after the signed trace. The Rust runner verifies in QEMU's
+CPU-visible flat resource map that PCI ECAM is the exact 256 MiB I/O window
+and the Intel remapper registers occupy only their expected byte extent.
+It also rejects any other visible resource in the rest of the remapper's
+4 KiB page. Unrecognized monitor output fails closed. This evidence is for
+the q35/TCG test fixture only: it is not guest firmware evidence and supplies
+no authority to a physical build.
+
+Before secondary CPUs start, the DMA probe also reads the live CPU
+protection controls. The requirement is four-level paging, supervisor
+write protection, NX enabled, and architectural UC at PAT index 3
+(not UC-minus). The loader clears PGE and PCIDE before loading the new root
+to retire firmware translations, and the BSP verifies those bits are off.
+A separate tested page-table verifier checks exact read-only
+supervisor NX device leaves and rejects another mapping of the same physical
+frame anywhere in the four-level hierarchy. It rejects table frames in the
+aperture, unsupported large leaves and excessive walks; it does not examine
+other roots or stale TLB entries. CPU policy and leaf checks do not establish
+that a claimed device resource exists. The ordinary DMA diagnostic images
+observe CPU policy but do not install device leaves or access registers.
+
+`mrml usb test-dma-map OVMF_CODE OVMF_VARS QEMU` uses separate signed
+test-only profiles and creates disposable media. The same profile must first
+halt before mapping if the private QEMU ACPI marker is absent. With the
+marker, the loader admits only the exact q35 topology, rejects conflicts
+with the firmware memory map or framebuffer, and rechecks the complete
+marker, DMAR, and MCFG snapshots against the final map after firmware exit.
+In the control case, the protected root maps only the remapper's first
+page and the ECAM page of fixture function `00:1b.0`; the BSP independently checks the exclusive
+read-only, non-executable device leaves. The BSP waits at a bounded
+rendezvous before AP startup. The host runner pauses the same instance
+and checks the exact live q35 memory map and dedicated emulated UART. For
+a valid release it also locates the assigned, aligned 16 KiB BAR0 of the
+separate fixture controller via the PCI monitor and confirms the exact
+capability and operational register subranges belong to that controller
+in the CPU FlatView. This is not proof for the remaining BAR bytes.
+Before sending the valid release, the paused host reads only the proved
+CAPLENGTH/HCIVERSION dword (requiring the operational base at offset 0x40),
+USBCMD and USBSTS. This records Run/Stop and HCHalted independently of the
+later PCI bus-master sample. In the signed q35 run, USBCMD was zero and
+USBSTS reported HCHalted even though PCI bus mastering was still enabled.
+These reads are observations; they neither halt
+the controller nor prove that it is safe to touch the full BAR or clear BME.
+Only then does it set the UART scratch byte over private QMP pipes and
+resume. The same signed image rejects the wrong release byte without
+touching either mapped device. With the right byte, it samples only
+fixed VT-d version, capability, extended capability and global status
+registers, and the exact xHCI function's PCI identity, command, class,
+header type and assigned BAR0 pair. The guest BAR base must match the
+paused host's observation. Neither side writes a BAR sizing probe, and the
+control guest does not map or read through the BAR. The guest checks the
+capability-derived VT-d arrays against the proven byte extent without reading them. The report
+includes the observed bus-master bit, not an ownership or shutdown proof.
+The read-only cases do not write device registers or initiate USB DMA. The marker
+is an opt-in for the isolated model, not authenticated hardware provenance.
+The same command additionally exercises a separate q35 topology. The boot
+USB and firmware devices stay on the bypassed default bus; test xHCI
+`41:00.0` is the only descendant of root port `40:00.0` on the separate
+remapped host bridge. The signed boot checks that DMAR describes precisely
+that sub-hierarchy plus the IOAPIC with interrupt remapping disabled, with
+no include-all unit or reserved ranges. It independently verifies the
+four read-only pages and reads the exact root port identity, bus numbers
+and inherited command bits after the valid release. Only the isolated
+case maps the first BAR page. Before release the host checks all ten
+rendered ranges on that page (capabilities, operational registers and
+eight port ranges) and rejects overlap in the unmapped tail. After release
+the guest requires the exact live PCI BAR assignment before reading
+CAPLENGTH, USBCMD and USBSTS, and the host rejects any disagreement with
+its paused sample. There are no port, runtime or doorbell register reads
+or writes by the guest. The paused host also checks the live QEMU bypass settings and exact PCI inventory of the
+remapped branch before accepting the signed report. The wrong-release
+case stops before touching PCI or VT-d registers in the guest. This shows
+the intended remapping scope and identifies the inherited firmware state;
+it does not disable either bus master, install translation or transfer
+USB data. Do not flash this profile or use it in a real hardware test.
+
+A separate shutdown case within this test-only image requires the exact
+version-2 fixture marker and a different release byte. Only the two ECAM
+function pages are writable; the BAR and remapper remain read-only.
+An already halted controller and inactive remapper are mandatory. The
+guest clears BME via a 16-bit PCI COMMAND write at the endpoint, verifies
+readback, then clears and checks the isolated root port. The paused QEMU
+monitor independently confirms both changes, no change to the boot USB
+command or status, and no change to xHCI status or remapper GSTS. The wrong-byte
+case still stops before device access. This is shutdown only: no reset,
+new translation, bus-master re-enable, or USB transfer.
+
+The bounded VT-d aperture path now supports a non-snooping table walker
+only when its trusted table backend explicitly provides ordered writeback.
+The x86 helper requires CPUID CLFSH, validates cache-line geometry, and
+flushes only lines intersecting the supplied pinned write-back table
+slice (at most six pages). Publication, rollback and revocation flush
+each changed leaf before context/IOTLB invalidation. An uncertain
+writeback is never reported as completed invalidation or released DMA
+memory. The normal direct-table constructor does not opt in implicitly.
+The cold-activation API prepares and writes back the exact six table
+frames before publishing their root pointer. It is limited to an
+exclusively owned, pristine 48-bit legacy unit with drain support. It
+waits for root-pointer acknowledgment, globally invalidates the context
+cache and IOTLB while translation is off, then enables and reads back
+translation. Failing after the first register write retains every page
+and keeps all requesters quiesced. Hosted register-model tests cover
+ordering and timeouts. The separately sealed QEMU profile (marker revision 3)
+also tests that startup on the live emulated remapper. Its first host release
+allows only the existing PCI shutdown sequence and preparation of six pinned
+write-back frames. With the same VM paused, the monitor independently checks
+both PCI commands, controller halt, zero RTADDR/GSTS/FSTS, the entire
+allocation's CPU-visible RAM backing, and every word of the six frames.
+The tables cover exactly requester 41:00.0, with no present DMA leaves.
+Only the second release permits access through the exact 0x230-byte register
+adapter. The success case requires RTADDR to match the checked root, GSTS to
+acknowledge it with translation on, no faults and no change to BME or the
+controller. A wrong first release skips guest register access entirely; a
+wrong second release leaves RTADDR/GSTS/FSTS zero with BME off. No controller
+reset, bus-master re-enable, DMA transfer or physical-hardware test occurs.
+
+Before the isolated shutdown case reaches its host rendezvous, the signed
+guest now verifies the entire boot-DMA allocation against the active root,
+rejects any second mapping or page-table frame overlap, and reads the BSP's
+cache controls. It requires PAT index 0 to select write-back and proves
+write-back coverage for each page above 1 MiB and below 4 GiB through either
+the default MTRR type or the union of matching write-back variable ranges.
+A conflicting type, malformed mask, disabled cache or uncovered page stops
+the probe. This read-only check validates a prerequisite of table writeback;
+it does not activate translation or authorize DMA.
+
+The live cold-profile test then installs one read/write DMA leaf through a
+bounded view of the six high-mapped frames, with no identity-map fallback.
+The same paused monitor checks the leaf points to the exact first payload
+page and that all other leaves are absent. A third release authorizes
+withdrawal only. The guest flushes the cleared permissions and waits for
+draining invalidation; the host confirms the leaf is non-present, the root
+is unchanged, and bus mastering is still off. The boot allocation remains
+pinned; no hardware or data transfer is implied.
+
+A fourth sealed profile adds a read-only preflight for the runtime and
+doorbell access needed by the native xHCI driver. The signed loader checks
+firmware-memory conflicts on every mapped page before and after exit from
+boot services. Only the first three BAR pages are mapped, with no aliases.
+The paused QEMU monitor attributes the exact capabilities, operational,
+port, runtime and doorbell ranges to the intended controller and rejects
+extra overlaps in the three mapped pages, including their padding. The fourth
+BAR page contains MSI-X resources and remains unmapped. Both sides verify DBOFF,
+RTSOFF, halted controller state, IMAN reserved bits, and doorbell readback.
+A distinct release is required. This preflight adds no xHCI or PCI writes,
+does not program queues, and does not start a transfer.
+
+The former profiles 5–7 ran xHCI command completion and USB mass-storage
+read/write tests at CPL0. They were QEMU-only milestones, not a production
+storage path. Their kernel-side driver wrapper and writable controller BAR
+mappings have been removed. The signed loader now rejects all three marker
+values before mapping. The no-remapper control separately rejects a missing
+DMAR before guest register access. The other profiles remain tests of the
+kernel’s mapping, quiescence, and DMA isolation mechanisms, with no native
+USB transfers.
+
+The driver and the read-only ownership sampler share one bounded xHCI
+extended-capability walker. It reports absent, unclaimed, firmware-owned,
+OS-owned, or contended semaphores and rejects malformed, duplicate, or
+out-of-range legacy capabilities. It never reads the adjacent legacy SMI
+control dword or writes ownership state. The sealed QEMU preflight
+independently expects no legacy interface. A semaphore observation alone
+is not authority for reset, DMA, or firmware handoff. Before the first
+controller programming operation the driver reads the bounded capability
+again and requires the same HCCPARAMS1 and exact legacy capability header
+at the same register offset. Firmware-owned or contended states, a mutated
+sample, or malformed readback fail before controller writes, PCI activation
+or DMA writes. This detects observed drift, not a handoff or a replacement
+for exclusive assignment and remapping.
+
+A test-only register model exercises the
+[xHCI legacy ownership handshake (§7.1)](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf).
+It requires firmware exit, completion of boot-source access, the same controller
+lease, and blocked DMA before it models one OS-semaphore byte write. Success
+requires consecutive OS-owned, firmware-clear samples from the same capability.
+Timeout, a lost request, reclaim, and capability drift fail without a retry or
+forced clear. The model never writes an actual register and does not authorize
+controller reset, bus mastering, or DMA. Stock QEMU's absent legacy capability
+does not substitute for testing a real firmware response.
+The standalone [UEFI xHCI inventory](../platform/UEFI_BOOT_MANAGEMENT.md#read-only-xhci-inventory-before-native-bring-up)
+uses the same sampler through the firmware PCI I/O protocol. It also
+reports validated MCFG coverage and the DMAR route for that exact
+requester, then returns to firmware without touching storage. Its QEMU
+test covers a controller with and without a remapper and an absent controller.
+
+The single xHCI transport implementation remains in `storage-usb`. Its
+runtime caller must be an isolated block-provider service implementing the
+existing generation-1 block-provider protocol; FAT32 stays in its separate
+filesystem service. A read-only adapter now implements canonical enumeration
+and one-sector reads over the existing BOT/SCSI driver. Hosted tests check
+stale-session denial, invalid range and buffer rejection, and no publication
+after a transport failure. In QEMU, the capability-checked MicroVM block-read
+queue now drives this adapter over the emulated USB 2 and USB 3 xHCI ports.
+The consumer reads back the FAT32 file sector, then sees an I/O failure on
+unplug and a stale session on retry, with no partial sector copied. The
+provider stops advertising the removed disk, and the fixture halts the
+controller and revokes bus mastering. These are hosted queue and emulated
+device results, not an executing service MicroVM. The xHCI retirement owner
+now keeps the exact controller while halt or revocation is pending, never
+reopening its I/O path on retry. The service MicroVM supervisor separately
+retains one host device lease for the exact launch generation and refuses
+guest access or replacement until withdrawal and destruction finish. Live
+KVM rollback exercises that ordering with a modeled device lease; the QEMU
+USB fixture exercises actual emulated controller halt and bus-master revocation.
+The scoped xHCI adapter now admits only the three broker-selected BAR pages
+and nonempty, in-range transfers in the exact DMA aperture. QEMU exercises
+USB 2 and USB 3 through this adapter, rejects the unprojected MSI-X page and
+out-of-range DMA, and still retires the same controller. These checks do not
+install hardware mappings. The supervisor now matches the lease's PCI
+requester, BAR pages and generation, and DMA object, range, mapping and allocation generations
+against a broker-provided projection. The controller-control and pinned
+DMA capabilities must authorize the two distinct objects at attachment.
+The xHCI adapter checks the same descriptor against the discovered
+controller and DMA assignment. The native lease owner independently checks
+it against the retained backing, including the exact BAR pages and pin generation. Live KVM exercises attachment with a
+modeled lease; QEMU exercises the controller and descriptor checks.
+The projected native installer now takes that retained lease, applies the
+BAR/DMA bounds before activation, and installs only the VT-d aperture taken
+from the same lease. The native-owner regression covers the scoped adapter
+and its cleanup. No test yet establishes a DMA mapping from xHCI to an
+executing service MicroVM. A device-dependent MicroVM can now be staged
+without allowing the supervisor to enter it before a matching lease is
+attached. The live KVM rollback test observes its first boot marker only
+after attaching a modeled lease. The supervisor now revalidates both retained
+capability generations and the exact lease projection on each device-bound
+guest access. Revocation or replacement of the DMA handle blocks later guest
+access without discarding the lease needed for teardown. Once a change is
+observed, the same endpoint stays fenced even if a subsequent sample appears
+unchanged. Only withdrawal and a fresh launch can make a new endpoint
+available. This is a supervisor admission fence, not hardware DMA teardown.
+The managed VT-d backend now also exposes a supervisor-only retirement step
+for a stopped, fenced guest. It revalidates the retained controller, clears
+only Run/Stop, and waits within a bounded budget for halt before disabling
+bus mastering and draining VT-d. Timeout leaves that lease closed to driver
+access and available for an exact cleanup retry. The controller model tests
+this path; it has not been installed in the Chromebook runtime.
+The adapter is not an installed provider and does not authenticate
+IPC or retire DMA leases by itself. The kernel grants and
+revokes scoped device, interrupt, and DMA resources; it does not run USB
+commands or implement a fallback transport. Until a service can receive and
+retire such a lease, native USB storage is unavailable. The driver library has one slot, no scratchpads,
+nonwrapping command and control queues, and no hub support. Dragonair boot
+exercises firmware USB access and embedded FAT32, not native USB I/O.
+
+The forward compatibility target is [USB4 v2.0](https://usb.org/documents).
+This storage path does not implement a USB4 connection manager, router or
+tunneling policy. Those require separate topology, DMA authorization and
+revocation, and physical validation. USB Type-C and Power Delivery are
+separate from xHCI storage. After native USB 2 and USB 3 storage work, qualify
+hardware link modes and loss/recovery (including 20 Gbps where the controller,
+device, and cable support it), then qualify USB4 routing separately. Do not
+infer a link rate from an emulated device or claim support across USB classes
+from a bulk-storage test.
+
 ## Optical object and common MMC layer
 
 Optical media is not an ordinary random-write disk. `OpticalDrive` reports

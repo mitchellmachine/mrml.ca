@@ -25,16 +25,31 @@ capability limits and secret redaction.
 The full commitments are in [MRML values](../../VALUES.md). Major design work
 must also follow the [Engineering Constitution](../ENGINEERING_CONSTITUTION.md).
 
+## How MRML runs
+
+Strict [Total MicroVM isolation](../ISOLATION_PLACEMENT.md) is the only MRML
+OS mode. Ordinary applications and services run in admitted microVMs or remain
+unavailable, with no native fallback. This is the design, not a claim of full
+implementation. The [Gigakernel](../GIGAKERNEL.md) is the privileged core.
+
+x86-64 is the primary OS bring-up target. Build tools, compiler, local ML,
+media libraries, and Git software can run as native Windows/Linux host
+software without booting MRML OS. macOS host support and ARM64 support are
+planned. The [platform test record](../PLATFORM_TESTS.md) separates verified
+host behavior from guest and physical hardware results.
+
 ## What exists today
 
-The repository contains working but experimental components for local
-inference, a microkernel, KVM and WHP virtualization backends, a Rust compiler
-subset, networking and cryptography, media codecs, storage, and first-party
-build tools. Maturity varies substantially between components.
+The repository contains experimental local inference, a capability-oriented
+Gigakernel, KVM and WHP backends, a Rust compiler subset, media codecs, storage
+providers, and native build tools. It also contains a separate protected SHA-256
+Git stack and certificate/ACME services with hosted Linux and Docker evidence.
+The GitHub repository uses SSH-signed source history; Gitd is a separate project
+component, not the host for that source.
 
-For current, machine-derived workspace facts, read
-[Workspace status](../STATUS.md). For implementation evidence and remaining
-kernel milestones, read [Microkernel](../MICROKERNEL.md). The
+Read [Project status](../PROJECT_STATUS.md) for implementation and test coverage
+across these areas. For implementation evidence and remaining
+kernel milestones, read [Gigakernel](../GIGAKERNEL.md). The
 [Roadmap](../ROADMAP.md) gives the dependency order for future work.
 
 ## Security and testing limits
@@ -44,10 +59,10 @@ but they do not protect a guest from a compromised host. MRML does not claim
 production security, formal verification, or physical-hardware support without
 specific evidence.
 
-Native Windows and local Windows VMM testing are currently suspended. Wine may
-be used for Windows-target toolchain coverage, but a Wine result is not native
-Windows, WHP, Hyper-V, VBS, or physical-hardware evidence. The exact trust model
-and claim limits are in [Security](../SECURITY.md).
+Native Windows tests use gnullvm. Local VMM testing can also run on a native
+Windows host with the required features; the results are recorded separately
+from compiler and runtime tests. See [Windows testing](../PROJECT_STATUS.md#windows-testing)
+for the current testing scope and [Security](../SECURITY.md) for claim limits.
 
 ## Where to go next
 
@@ -60,6 +75,6 @@ and claim limits are in [Security](../SECURITY.md).
   services, accessibility, and isolation.
 
 The homepage is [mrml.ca](https://mrml.ca), and the source repository is
-[git.mrml.ca/mitchellrenouf/mrml](https://git.mrml.ca/mitchellrenouf/mrml).
+[github.com/mitchellmachine/mrml](https://github.com/mitchellmachine/mrml).
 Questions and comments are welcome at
 [mitchellrenouf@mrml.ca](mailto:mitchellrenouf@mrml.ca).

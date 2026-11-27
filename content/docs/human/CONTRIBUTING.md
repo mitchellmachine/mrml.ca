@@ -8,6 +8,11 @@ This page is a readable introduction. The root `AGENTS.md`,
 [Engineering Constitution](../ENGINEERING_CONSTITUTION.md), and canonical
 subsystem documents contain the complete rules.
 
+Effective work across the project requires advanced systems and security
+expertise or authorized access to specialized defensive cybersecurity tools.
+See the [README](../../README.md#contributing-and-security-review) for the
+maintainer's rationale and the limits of automated review.
+
 ## Before you edit
 
 1. Inspect `git status`, recent history, the affected source, and its tests.
@@ -70,10 +75,10 @@ Build and test every change on Linux. Run focused tests and adversarial cases
 appropriate to the boundary you changed. Use the repository's assurance and
 formatting checks, and record exact commands and outcomes.
 
-Windows-target toolchain checks may run under Wine. Label them as Wine
-toolchain coverage, never as native Windows or Windows VMM evidence. Local
-Windows VMM testing is suspended; do not attempt WHP, WHPX, Hyper-V, or VBS
-tests through Wine.
+Run relevant Windows checks on native Windows with gnullvm. Run Windows
+VMM tests only on native Windows with the required features. Wine can be
+used for separately labeled toolchain coverage, not VMM evidence. See
+[Windows testing](../PROJECT_STATUS.md#windows-testing).
 
 Do not claim physical hardware, firmware, Secure Boot, TPM, IOMMU, KVM, WHP, or
 platform support unless that exact environment was exercised. Simulation,

@@ -6,6 +6,46 @@ evidence ledger in `packages/compiler/core/README.md`. If chat history or a loca
 worktree is lost, recover this checkpoint first and verify every claim against
 the named commit and current source.
 
+## Integrated literal conformance checkpoint
+
+Signed commits `b107887c` and `0314dd24` on `main` align character
+Unicode escape digits with Rust 2024 and reject uppercase integer base
+prefixes at the prefix span. They preserve the earlier compiler checkpoint
+and do not change the linker or production compiler selection. The source
+commits record 14 public frontend probes against ORACLE-0004, including
+successful Windows execution and Linux ELF emission. The source worktree's
+compiler core and driver suites passed on both Windows gnullvm and Arch
+WSL2. This records that run's evidence; it does not explain the earlier
+Windows loader error 623.
+
+Signed commit `47dd97cf` adds exact two-digit hexadecimal escapes with the
+ASCII limit for `char` and the full `u8` range for byte literals. Its source
+checkpoint passed 1,349 core and 19 driver tests on both hosts, and eight
+public frontend probes matched ORACLE-0004. Accepted Windows outputs ran;
+the Linux check covered ELF emission.
+
+## Integrated frontend checkpoint
+
+Commit `d2aeb100` on `main` includes four signed frontend changes:
+
+- `6858447f`: locate malformed or unsupported struct and enum headers.
+- `509af8ed`: accept a leading parameterless `#![no_std]` in the existing
+  freestanding subset.
+- `9917fe48`: restore the hosted Windows debug frontend's 32 MiB stack budget.
+- `d2aeb100`: require canonical decimal tuple field indices in reads and
+  assignments.
+
+The commit messages retain the Windows, Arch WSL2, and ORACLE-0004 checks.
+On the combined tree, the compiler core and driver suites passed on Arch
+WSL2. On Windows, all 19 driver tests and the focused parser tests passed.
+The Windows core run stopped after 853 tests passed and one failed:
+`generated_pe_executes_on_the_controlled_windows_host` hit Windows loader
+error 623. That test's PE linker and fixed machine-code input are unchanged
+by these commits. The public experimental frontend emitted the scalar PE on
+Windows, but that run did not verify execution. These changes neither
+implement general aggregate support nor change the production compiler
+selection.
+
 ## Recoverable baseline
 
 - Branch: `main`
@@ -44,12 +84,16 @@ the named commit and current source.
   (`Bound runtime place projection facts`), `308c781`
   (`Record stable runtime identifier reads`), and `099b11c` (`Retain bounded
   runtime place facts`).
-- Current build/oracle: `docs/compiler/oracles/ORACLE-0003.md`, rustc
-  `1.100.0-nightly`, full commit
-  `17fd5b8a37b6667b6cc137f3cc35f09759768a3b`, dated 2026-08-28 and
-  distributed as `nightly-2026-08-29`. Preserve ORACLE-0001 and ORACLE-0002 as
-  prior generations. Native Arch and Wine-hosted gnullvm each pass 1,295
-  compiler tests; Wine is toolchain coverage, not native Windows evidence.
+- Current build/oracle: `docs/compiler/oracles/ORACLE-0004.md`, rustc
+  `1.102.0-nightly`, full commit `6c709eb428d472a3c3d93681c1ba37d44a1c27cf`,
+  dated 2026-11-25 and distributed as `nightly-2026-11-26`. Arch WSL2
+  passed all 1,357 compiler tests. Native Windows passed 1,339 core tests.
+  Both native Windows (`x86_64-pc-windows-gnullvm`, no MSVC or Windows SDK)
+  and Arch WSL2 passed 50 runtime tests and 18 driver tests after the Windows
+  retained-file operations were implemented. The earlier driver blocker
+  remains recorded in ORACLE-0004 as baseline evidence. Prior oracle records
+  remain unchanged; the TLS probe edits document safety without changing
+  probe behavior.
 - Language direction: Rust 2024 is the edition floor. Contemporary and future
   Rust semantics are the target; obsolete editions, historical unsoundness,
   rustc internals, diagnostic wording, and unstable Rust ABI details are not
@@ -60,7 +104,48 @@ oracle upgrade receives a new immutable record and differential classification
 against all prior accepted probes. Keep Cargo on edition 2024 until a newer
 named edition can be adopted through a pinned, workspace-wide migration.
 
-## Latest bounded language milestone
+## Hosted Windows file operations
+
+- Locking waits on a whole-file Win32 byte-range lock, including future writes
+  beyond the current end of the file. Ordinary I/O from competing handles fails
+  while the lock is held. Memory-mapped access is outside that guarantee.
+- Ownership changes use SID strings and a dedicated regular-file handle opened
+  for Windows security-metadata access. They replace the DACL by handle and
+  protect it from inheritance. Supported modes have nested owner, group and
+  other grants; unrepresentable modes and Unix special bits fail instead of
+  widening access. Open handles and Windows privilege or owner-rights rules
+  are not revoked or redefined. Linux numeric UID/GID behavior is unchanged.
+- Native Windows commands (both passed):
+  `mrml test org.mrml.library.runtime --target windows --release` and
+  `mrml test org.mrml.compiler.driver --target windows --release`.
+  The native Windows core rerun passed 1,339 tests: 848 unit tests and 491
+  across the four declared integration suites. The sandboxed frontend run
+  built the core but stopped when Windows refused to launch a generated PE
+  (loader error 623). The same freshly built unit executable passed outside
+  the sandbox. The four integration suites were rebuilt using the frontend's
+  declared flags and the fresh core library, then passed outside the sandbox.
+  Arch WSL2 commands (both passed):
+  `mrml test org.mrml.library.runtime --target linux --release` and
+  `mrml test org.mrml.compiler.driver --target linux --release`.
+- In a native Windows disposable-file probe, Windows denied a write-open
+  after mode 0400, restored write access at 0644, and reported the requested
+  primary group and protected ACL with three explicit grants. The normal
+  read handle could not change the DACL. This is native hosted file-system
+  evidence, not coverage for every Windows file system or account policy.
+- The workspace manifest check passed. Both Windows TLS probes now have
+  narrowly scoped unsafe-policy entries and returned 42 when built and run
+  with the pinned Windows oracle. The repository-wide `mrml assurance check`
+  stopped at AES-GCM unsafe-policy drift during this run. That issue was
+  fixed later; see [Project status](../PROJECT_STATUS.md#workspace-checks-and-generated-inventories)
+  for the current blocker. Assurance is separate from the focused Windows
+  test results.
+- Patent review: **NOT_TRIGGERED**; this uses existing operating-system
+  locking and access-control primitives. See [review log](../patents/REVIEW_LOG.md).
+
+## Earlier bounded language milestones
+
+Individual platform skips below describe only the recorded increment. For the
+current native Windows rerun see [Hosted Windows file operations](#hosted-windows-file-operations).
 
 The MRML V1 two-word emitter now accepts modern same-width `cast_signed` and
 `cast_unsigned` methods for `u128`/`i128`, together with their saturating and

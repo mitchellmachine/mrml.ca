@@ -11,7 +11,7 @@ reading every technical document in order.
 - [Contributing](CONTRIBUTING.md): contribution, security, accessibility, and
   evidence rules.
 - [Verify commits](VERIFY_COMMITS.md): verify repository history with the
-  project GPG public key.
+  project SSH signing key (Ed25519).
 
 ## Essential project documents
 
@@ -22,7 +22,8 @@ reading every technical document in order.
   status vocabulary.
 - [Security](../SECURITY.md) defines trust boundaries and security claims.
 - [Roadmap](../ROADMAP.md) gives the dependency order for implementation.
-- [Workspace status](../STATUS.md) contains generated current workspace facts.
+- [Project status](../PROJECT_STATUS.md) summarizes implemented work, checked
+  workspace facts, evidence boundaries, and known gaps.
 - [Recovery](../RECOVERY.md) explains how to reconstruct work from repository
   state when other context is unavailable.
 
@@ -33,8 +34,11 @@ reading every technical document in order.
 | Applications, services, GUI, isolation, or AI access | [Application platform](../APPLICATION_PLATFORM.md) and [Isolation placement](../ISOLATION_PLACEMENT.md) |
 | Accessibility, semantic interfaces, Braille, or monitor-off operation | [Accessibility](../ACCESSIBILITY.md), [Braille interface](../accessibility/BRAILLE_INTERFACE.md), and [Monitor-off acceptance](../accessibility/MONITOR_OFF_ACCEPTANCE.md) |
 | Browser semantics or AI/browser control | [Browser semantics](../BROWSER_SEMANTICS.md) |
-| Kernel implementation or boot evidence | [Microkernel](../MICROKERNEL.md) |
+| Kernel implementation or boot evidence | [Gigakernel](../GIGAKERNEL.md) and [UEFI boot management](../platform/UEFI_BOOT_MANAGEMENT.md) |
+| Windows/Linux host software or planned platforms | [Host software](../../README.md#software-for-windows-and-linux), [Project status](../PROJECT_STATUS.md#current-direction), and [Platform tests](../PLATFORM_TESTS.md) |
 | Build tools, packages, releases, or installation | [Build system](../build/BUILD_SYSTEM.md), [Deployment](../DEPLOYMENT.md), and [Artifact extensions](../packages/ARTIFACT_EXTENSIONS.md) |
+| Git client, Gitd, and protected Git deployments | [Current Git checkpoint](../gitd/operations/CURRENT_COMPLETION.md), [Linux deployment adapter](../gitd/edge/LINUX_DEPLOYMENT.md), and [Compose guide](../../deploy/compose/README.md) |
+| Certificates and ACME | [ACME and certificate service](../ACME.md) and [Compose guide](../../deploy/compose/README.md) |
 | Dynamic component interfaces | [Component interfaces](../packages/COMPONENT_INTERFACES.md) |
 | Rust compiler or ABI work | [Compiler](../COMPILER.md), [Compiler checkpoint](../compiler/CHECKPOINT.md), and [MRML ABI](../compiler/MRML_ABI_V1.md) |
 | VMM devices | [Paravirtual devices](../PARAVIRTUAL_DEVICES.md) |
@@ -67,10 +71,11 @@ than guessing.
 ## Machine and generated material
 
 Long technical reference material and machine-oriented documentation live under
-[Machine documentation](../machine/README.md). Generated workspace facts remain
-in [Workspace status](../STATUS.md) and
-[Unsafe inventory](../UNSAFE_INVENTORY.md). Do not hand-edit generated files
-unless their generator's documented workflow requires it.
+[Machine documentation](../machine/README.md). The generated
+[workspace status](../STATUS.md) and [unsafe inventory](../UNSAFE_INVENTORY.md)
+are retained snapshots pending a successful assurance run. See
+[Project status](../PROJECT_STATUS.md#workspace-checks-and-generated-inventories)
+for the live commands and blocker. Do not hand-edit the generated files.
 
 Technical documents outside `docs/human/` remain canonical when linked above.
 Moving or summarizing them must not erase security invariants, evidence labels,

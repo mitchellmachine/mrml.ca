@@ -1,8 +1,9 @@
 # MRML bootstrap build and packaging toolchain
 
-Current machine-derived package, graph, source, unsafe-boundary, and CI facts
-are in the generated [workspace status](../STATUS.md). This document defines
-architecture and policy rather than maintaining duplicate package counts.
+For the current package graph run `mrml manifest check` and
+`mrml manifest lock --check`. [Project status](../PROJECT_STATUS.md) records
+observed results and explains why the generated inventory is not current.
+This document defines architecture and policy rather than duplicating counts.
 
 **Status: PARTIALLY IMPLEMENTED.** `packages/tools/mrml` parses versioned root
 and package-local manifests, validates the declared graph, audits exact unusual
