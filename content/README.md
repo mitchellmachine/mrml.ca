@@ -25,7 +25,9 @@ necessary mechanisms, not alternate operating modes for apps or services.
 The design shares the small privileged core and capability principles of
 microkernels and uses hardware virtualization, as the Hyperkernel research
 project did. MRML's defining choice is to make placement in a supervised
-microVM mandatory for ordinary workloads. The name makes no claim of
+microVM mandatory for ordinary workloads. Gigakernel is MRML’s name for
+this design; whether it constitutes a distinct kernel class remains open.
+The name makes no claim of
 architectural priority or formal verification. See the
 [architecture comparison](docs/GIGAKERNEL.md#how-the-gigakernel-compares)
 and [placement rules](docs/ISOLATION_PLACEMENT.md).

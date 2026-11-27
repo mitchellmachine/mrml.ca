@@ -107,7 +107,7 @@ page(home, 'Systems research in Rust', home, `
 <div>
 <p class="kicker">Experimental systems research</p>
 <h1>Systems research<br>in <em>Rust.</em></h1>
-<p class="intro">MRML is a Rust research project spanning operating systems, compilers, and local machine learning. Its Gigakernel is being built around strict Total MicroVM isolation, with no native fallback inside MRML OS.</p>
+<p class="intro">MRML is a Rust research project spanning operating systems, compilers, and local machine learning. Gigakernel is the project name for this experimental kernel design. Inside MRML OS, ordinary applications and services are designed to run only in supervised microVMs, with no native fallback.</p><p>Whether that design constitutes a distinct class of kernel remains an open question.</p>
 <div class="actions"><a class="button" href="docs.html">Explore documentation</a><a class="button secondary" href="${repository}/releases">View releases</a></div>
 </div>
 <div class="stack">

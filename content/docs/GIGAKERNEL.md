@@ -2,7 +2,10 @@
 
 The MRML Gigakernel is named after Gigachad. It provides the privileged
 mechanisms for Total MicroVM isolation; ordinary apps and services belong in
-admitted microVMs. The name does not imply that full-system operation is ready.
+admitted microVMs. Gigakernel is the project’s name for this design, not an
+established kernel classification. Whether the design constitutes a distinct
+kernel class remains open. The name does not imply that full-system operation
+is ready.
 
 This file is the detailed implementation and dated evidence ledger. Stable
 project direction is in [ARCHITECTURE.md](ARCHITECTURE.md), normative boundaries
