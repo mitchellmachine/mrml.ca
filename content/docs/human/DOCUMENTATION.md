@@ -34,7 +34,7 @@ reading every technical document in order.
 | Applications, services, GUI, isolation, or AI access | [Application platform](../APPLICATION_PLATFORM.md) and [Isolation placement](../ISOLATION_PLACEMENT.md) |
 | Accessibility, semantic interfaces, Braille, or monitor-off operation | [Accessibility](../ACCESSIBILITY.md), [Braille interface](../accessibility/BRAILLE_INTERFACE.md), and [Monitor-off acceptance](../accessibility/MONITOR_OFF_ACCEPTANCE.md) |
 | Browser semantics or AI/browser control | [Browser semantics](../BROWSER_SEMANTICS.md) |
-| Kernel implementation or boot evidence | [Gigakernel](../GIGAKERNEL.md) and [UEFI boot management](../platform/UEFI_BOOT_MANAGEMENT.md) |
+| Kernel implementation or boot evidence | [Gigakernel](../gigakernel.md) and [UEFI boot management](../platform/UEFI_BOOT_MANAGEMENT.md) |
 | Windows/Linux host software or planned platforms | [Host software](../../README.md#software-for-windows-and-linux), [Project status](../PROJECT_STATUS.md#current-direction), and [Platform tests](../PLATFORM_TESTS.md) |
 | Build tools, packages, releases, or installation | [Build system](../build/BUILD_SYSTEM.md), [Deployment](../DEPLOYMENT.md), and [Artifact extensions](../packages/ARTIFACT_EXTENSIONS.md) |
 | Git client, Gitd, and protected Git deployments | [Current Git checkpoint](../gitd/operations/CURRENT_COMPLETION.md), [Linux deployment adapter](../gitd/edge/LINUX_DEPLOYMENT.md), and [Compose guide](../../deploy/compose/README.md) |

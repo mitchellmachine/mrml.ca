@@ -1,5 +1,5 @@
 {
-  "revision": "2b22408004efb632dfdc0d9badada46f97a760cf",
+  "revision": "e91aef6c620ec939f33fe4a551691fdcd07ce45b",
   "paths": [
     "LICENSE",
     "README.md",
@@ -14,7 +14,6 @@
     "docs/COMPILER.md",
     "docs/DEPLOYMENT.md",
     "docs/ENGINEERING_CONSTITUTION.md",
-    "docs/GIGAKERNEL.md",
     "docs/ISOLATION_PLACEMENT.md",
     "docs/PARAVIRTUAL_DEVICES.md",
     "docs/PLATFORM_TESTS.md",
@@ -37,6 +36,7 @@
     "docs/compiler/oracles/ORACLE-0002.md",
     "docs/compiler/oracles/ORACLE-0003.md",
     "docs/compiler/oracles/ORACLE-0004.md",
+    "docs/gigakernel.md",
     "docs/gitd/authority/CHANNEL.md",
     "docs/gitd/client/KEY_PROVIDERS.md",
     "docs/gitd/core/ARCHITECTURE.md",

@@ -226,7 +226,11 @@ the executable, stop and record the refusal. An SSH-signed source commit does
 not sign the EFI executable for Secure Boot.
 
 Record the controller's PCI address, IDs, command state, BAR0, ownership,
-MCFG coverage and DMAR route as shown on the console. The application
+MCFG coverage, DMAR route, and the `xhci DMA` line as shown on the console.
+The DMA line reports the controller's scratchpad buffer count and supported
+page-size bitmask (bit 0 is 4 KiB). An unavailable line is not a zero count.
+These reads do not allocate scratchpads or qualify the controller for transfer.
+The application
 returns to the shell without leaving UEFI Boot Services. It does not write
 a report to storage, read disk contents, change bus mastering, write
 controller registers, or hand off DMA. A firmware-owned or contended
@@ -250,6 +254,11 @@ controller handoff. That build did not verify the boot-source relationship.
 The subsequent topology-only EFI test (build 659ea7ed) reported
 `shared-usb` on the same Chromebook: the boot stick uses that xHCI
 controller. Another port or USB stick does not prove controller separation.
+The 2026-11-27 read-only follow-up (`87b78e16`, `XHCI87B.EFI`) confirmed
+34 scratchpads and page mask `0x0001` (4 KiB only), or 136 KiB of scratchpad
+buffers before the pointer array and other DMA objects. The controller was
+still firmware-owned and shared with the USB boot source. The diagnostic
+reported zero incomplete controllers and returned to EFI Shell without handoff.
 
 The signed QEMU/OVMF negative control boots the same sealed test release
 from a read-only virtual disk attached directly to the sole xHCI candidate.
@@ -292,7 +301,10 @@ release through the test UART; it does not write PCI configuration in
 the guest case. A denied release writes no command and stops. The allow
 case continues from RAM only after the host verifies the exact change.
 This diagnostic is not in the normal boot profile and does not claim
-legacy semaphore transfer or enable DMA.
+legacy semaphore transfer or enable DMA. An independent software model
+checks the retained lease, blocked DMA, quiescent boot source, and exact
+capability again at the OS-semaphore write boundary. If any changed since
+observation, it records no write. This is not a real firmware handshake.
 
 ### Diagnose a return to firmware
 

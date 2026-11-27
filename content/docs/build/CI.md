@@ -3,8 +3,8 @@
 The GitHub Actions workflows in `.github/workflows/` use the oracle in
 `rust-toolchain.toml` and check the recorded compiler commit. A workflow in the
 tree is configuration, not evidence that GitHub ran it or that it passed.
-Jobs use `ubuntu-latest`, `windows-latest`, and `macos-latest`. The Set up job
-log records the actual image and runner software versions.
+Jobs use `ubuntu-latest` and `windows-latest`. The Set up job log records
+the actual image and runner software versions.
 
 - **Windows, native gnullvm:** build and test all Windows-admitted components.
   The stage-zero frontend uses GNU/LLVM without requiring MSVC or the Windows
@@ -13,10 +13,6 @@ log records the actual image and runner software versions.
   separate AddressSanitizer sweep. No Windows toolchain or Wine substitutes for
   native Windows tests. Expanded CUDA checks build the host CUDA feature profile
   on both hosts and PTX for SM100 and SM120; these are compile-only.
-- **macOS:** compile the Cargo stage-zero frontend, run selected portable
-  manifest, input-audit, and assurance tests, and verify manifests and lock
-  state. This limited bootstrap coverage does not establish a supported macOS host,
-  a VMM port, or ARM64 support.
 - **MRML target:** build all MRML-target packages and all UEFI-target packages.
   `mrml test --all --target native` builds the relevant native component and
   runs its declared host test harness on the runner. Components without such
@@ -29,6 +25,7 @@ log records the actual image and runner software versions.
 still exits nonzero for the aggregate. Tests compile the selected declared
 test/example/benchmark outputs; sample timings, ignored tests, conditional
 external oracles and hardware-specific features are not automatically exercised.
+macOS host support remains planned and is not covered by CI.
 The matrix does not build every experimental feature combination and does not
 prove hardware support, native guest userspace test coverage or release readiness.
 

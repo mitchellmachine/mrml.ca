@@ -1,8 +1,8 @@
 # MRML operating-system roadmap
 
 This roadmap is dependency ordered. It describes intended work, not completion
-claims. Status is determined from source, tests, and the evidence ledger in
-[GIGAKERNEL.md](GIGAKERNEL.md), using the vocabulary in
+claims. Status is determined from source, tests, and current and archived
+evidence linked in the [Gigakernel guide](gigakernel.md), using the vocabulary in
 [ARCHITECTURE.md](ARCHITECTURE.md). [Project status](PROJECT_STATUS.md) connects
 the current workspace, compiler, hosted services, and verification scope. The
 numbered component counts below belong to dated migration chronology, not the

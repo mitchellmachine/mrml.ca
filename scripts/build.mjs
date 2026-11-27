@@ -59,7 +59,7 @@ const link = (from, file, title) => {
 };
 const groups = [
   ['Start here', 'docs/human/OVERVIEW.md', 'docs/human/GETTING_STARTED.md', 'docs/human/CONTRIBUTING.md', 'VALUES.md', 'docs/PROJECT_STATUS.md', 'docs/ROADMAP.md'],
-  ['System architecture', 'docs/ARCHITECTURE.md', 'docs/GIGAKERNEL.md', 'docs/APPLICATION_PLATFORM.md', 'docs/SECURITY.md', 'docs/RECOVERY.md'],
+  ['System architecture', 'docs/ARCHITECTURE.md', 'docs/gigakernel.md', 'docs/APPLICATION_PLATFORM.md', 'docs/SECURITY.md', 'docs/RECOVERY.md'],
   ['Accessibility and interaction', 'docs/ACCESSIBILITY.md', 'docs/accessibility/BRAILLE_INTERFACE.md', 'docs/accessibility/MONITOR_OFF_ACCEPTANCE.md', 'docs/BROWSER_SEMANTICS.md'],
   ['Compiler and build tools', 'docs/COMPILER.md', 'docs/compiler/LINKER.md', 'docs/build/BUILD_SYSTEM.md', 'docs/DEPLOYMENT.md'],
 ];
@@ -115,7 +115,7 @@ page(home, 'Systems research in Rust', home, `
 <div class="stack-row"><span>Interaction</span>${link(home, 'docs/ACCESSIBILITY.md', 'Accessible interfaces')}</div>
 <div class="stack-row"><span>Application layer</span>${link(home, 'docs/APPLICATION_PLATFORM.md', 'Application platform')}</div>
 <div class="stack-row"><span>Isolation</span>${link(home, 'docs/ISOLATION_PLACEMENT.md', 'Total MicroVM isolation')}</div>
-<div class="stack-row"><span>Mechanisms</span>${link(home, 'docs/GIGAKERNEL.md', 'Gigakernel')}</div>
+<div class="stack-row"><span>Mechanisms</span>${link(home, 'docs/gigakernel.md', 'Gigakernel')}</div>
 </div>
 </section>
 <section class="section">
@@ -193,7 +193,7 @@ ${toc.length ? `<nav class="toc" aria-label="On this page"><h2>On this page</h2>
 }
 
 const renamedPages = [
-  ['reading/docs/microkernel.html', 'docs/GIGAKERNEL.md'],
+  ['reading/docs/microkernel.html', 'docs/gigakernel.md'],
   ['reading/docs/gitd/edge/microkernel_port.html', 'docs/gitd/edge/GIGAKERNEL_PORT.md'],
 ];
 for (const [output, current] of renamedPages) {

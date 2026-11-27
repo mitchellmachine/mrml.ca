@@ -30,7 +30,7 @@ must also follow the [Engineering Constitution](../ENGINEERING_CONSTITUTION.md).
 Strict [Total MicroVM isolation](../ISOLATION_PLACEMENT.md) is the only MRML
 OS mode. Ordinary applications and services run in admitted microVMs or remain
 unavailable, with no native fallback. This is the design, not a claim of full
-implementation. The [Gigakernel](../GIGAKERNEL.md) is the privileged core.
+implementation. The [Gigakernel](../gigakernel.md) is the privileged core.
 
 x86-64 is the primary OS bring-up target. Build tools, compiler, local ML,
 media libraries, and Git software can run as native Windows/Linux host
@@ -49,7 +49,7 @@ component, not the host for that source.
 
 Read [Project status](../PROJECT_STATUS.md) for implementation and test coverage
 across these areas. For implementation evidence and remaining
-kernel milestones, read [Gigakernel](../GIGAKERNEL.md). The
+kernel milestones, read [Gigakernel](../gigakernel.md). The
 [Roadmap](../ROADMAP.md) gives the dependency order for future work.
 
 ## Security and testing limits

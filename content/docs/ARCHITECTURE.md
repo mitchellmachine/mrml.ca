@@ -1,7 +1,7 @@
 # MRML operating-system architecture
 
-This is the durable architectural overview. Detailed implementation history and
-probe evidence remain in [GIGAKERNEL.md](GIGAKERNEL.md); security boundaries
+This is the durable architectural overview. The [Gigakernel guide](gigakernel.md)
+summarizes current evidence and links to the historical ledger; security boundaries
 are normative in [SECURITY.md](SECURITY.md); dependency order is in
 [ROADMAP.md](ROADMAP.md); the application contract is in
 [APPLICATION_PLATFORM.md](APPLICATION_PLATFORM.md); context-loss recovery is in
@@ -178,7 +178,7 @@ privilege stacks, CPL3 domains, APIC timer preemption, SMP startup, IPIs,
 scheduling and migration, fixed-capacity generational capabilities and tasks,
 bounded IPC, fault retirement, service restart policy, guest-memory policy, and
 native KVM and Windows WHP launch backends. Signed controlled probes exercise
-subsets of these mechanisms. See the evidence ledger in GIGAKERNEL.md.
+subsets of these mechanisms. See the [Gigakernel guide](gigakernel.md) for current and archived evidence.
 
 **PARTIALLY IMPLEMENTED:** blocking receive and scheduler wakeup, bounded
 backpressure, attenuated capability transfer with bounded transitive IPC-handle

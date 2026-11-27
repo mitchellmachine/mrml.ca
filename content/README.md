@@ -15,7 +15,7 @@ only after the system admits it and verifies that the required resources and
 transport are available. If they are not, the workload remains unavailable.
 There is no native fallback.
 
-The [MRML Gigakernel](docs/GIGAKERNEL.md), named after Gigachad, is the
+The [MRML Gigakernel](docs/gigakernel.md), named after Gigachad, is the
 privileged core that supplies launch, memory, and communication mechanisms.
 Access across microVMs requires explicit, scoped, revocable capabilities.
 A signature can establish provenance; it does not by itself authorize access
@@ -29,7 +29,7 @@ microVM mandatory for ordinary workloads. Gigakernel is MRML’s name for
 this design; whether it constitutes a distinct kernel class remains open.
 The name makes no claim of
 architectural priority or formal verification. See the
-[architecture comparison](docs/GIGAKERNEL.md#how-the-gigakernel-compares)
+[architecture comparison](docs/gigakernel.md#how-the-gigakernel-compares)
 and [placement rules](docs/ISOLATION_PLACEMENT.md).
 
 ## Software for Windows and Linux

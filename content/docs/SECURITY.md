@@ -1,7 +1,8 @@
 # MRML operating-system security model
 
-This document states security boundaries and non-claims. Implementation details
-and dated evidence are in [GIGAKERNEL.md](GIGAKERNEL.md).
+This document states security boundaries and non-claims. The
+[Gigakernel guide](gigakernel.md) summarizes current implementation evidence
+and links to the dated ledger.
 
 ## MRML security principles
 

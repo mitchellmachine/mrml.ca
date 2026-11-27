@@ -15,7 +15,7 @@ and the [Engineering Constitution](ENGINEERING_CONSTITUTION.md).
   experimental compiler, local ML, media libraries, and the Git client have
   native Windows/Linux host targets. WHP is Windows-specific and KVM is
   Linux-specific. macOS host support and ARM64 support are **PLANNED**.
-  Portable macOS CI checks are not a host release or VMM port.
+  macOS is not currently covered by CI.
 - **USB:** signed KVM diagnostics at `40554703` wrote, flushed, and reread
   the exact `PROBE.TXT` marker through emulated xHCI on USB 2 and USB 3.
   Independent whole-image checks found only the expected three bytes changed.
@@ -27,7 +27,7 @@ and the [Engineering Constitution](ENGINEERING_CONSTITUTION.md).
 | --- | --- | --- |
 | Build and packaging | Manifest V2, a locked package graph, direct native build/test actions, canonical package creation and verification, and fixed boot SystemRelease tooling. Cargo bootstraps the frontend; upstream Rust remains the production backend. | `mrml manifest check`: 71 components and 215 dependencies. `mrml manifest lock --check`: 71 packages and five interface lock records. General Store publication and complete installation workflows remain unfinished. [Build system](build/BUILD_SYSTEM.md) |
 | Compiler | Experimental Rust 2024 subset, separate driver, and bounded MRML linker for x86-64 ELF and PE/COFF. Production does not silently switch to it. | ORACLE-0004 pins `nightly-2026-11-26` at rustc `6c709eb4`. Native Windows passed 1,339 compiler-core, 18 driver and 50 runtime tests on gnullvm without MSVC or the Windows SDK. The runtime and driver also passed on Arch WSL2. The checkpoint distinguishes sandboxed runs from native execution. [Compiler](COMPILER.md), [checkpoint](compiler/CHECKPOINT.md) |
-| Kernel, services and storage | Capability-based Gigakernel, hosted KVM and WHP adapters, supervised service mechanisms, SATA AHCI and FAT32 providers, and versioned storage interfaces. | Storage-provider and service work is incremental. Read the [roadmap](ROADMAP.md#current-priority) and [Gigakernel ledger](GIGAKERNEL.md) for exact probe stages. A hosted guest, model, or driver build does not establish physical-device support, production storage durability, or isolation from the host. |
+| Kernel, services and storage | Capability-based Gigakernel, hosted KVM and WHP adapters, supervised service mechanisms, SATA AHCI and FAT32 providers, and versioned storage interfaces. | Storage-provider and service work is incremental. Read the [roadmap](ROADMAP.md#current-priority) and [Gigakernel guide](gigakernel.md) for current evidence and remaining gates. A hosted guest, model, or driver build does not establish physical-device support, production storage durability, or isolation from the host. |
 | GUI, accessibility and browser | Compositor, GUI surface interface and probe source exist. Accessibility and browser documents specify the shared semantic interface, authority boundaries and acceptance goals. | Do not infer a complete desktop/browser, physical Braille support or passing monitor-off acceptance from interface or probe code. [Application platform](APPLICATION_PLATFORM.md), [monitor-off acceptance](accessibility/MONITOR_OFF_ACCEPTANCE.md), [browser semantics](BROWSER_SEMANTICS.md) |
 | Local ML, GPU and codecs | Hosted model, tokenizer, tensor and trainer packages; experimental media implementations. Zstandard has bounded compressed-block support. AV1 and Opus have their own conformance and verification ledgers. | The focused Windows gnullvm Zstandard release suite passed 49 tests. A package listing, host build, or CUDA compile-only check does not establish hardware execution or full codec conformance. [GPU architecture](gpu/GPU_ARCHITECTURE.md), [Zstandard profile](gitd/edge/CACHE_AND_ZSTD.md), [AV1 conformance](../packages/libraries/av1/CONFORMANCE.md), [Opus](../packages/libraries/opus/README.md) |
 | Git and Gitd | Hosted protected SHA-256 Git, Gitd, a separate authority, and offline releases and recovery tooling. Base Compose publishes TCP 443 to Gitd; its accepted transport is TLS 1.3 with HTTP/2. | Dated hardened Docker tests cover protected pushes, verified offline images, backup and clean restore, and recreation. HTTP/3 is not enabled in that baseline. This project’s GitHub source history is SHA-1 and separately SSH-signed; it is not served by Gitd. [Git checkpoint](gitd/operations/CURRENT_COMPLETION.md), [source verification](human/VERIFY_COMMITS.md) |
@@ -44,7 +44,7 @@ only.
 
 [Setup and test commands](human/GETTING_STARTED.md) ·
 [Compiler test evidence](compiler/CHECKPOINT.md) ·
-[Kernel and VMM evidence](GIGAKERNEL.md)
+[Kernel and VMM evidence](gigakernel.md)
 
 ## Workspace checks and generated inventories
 

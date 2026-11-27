@@ -75,14 +75,14 @@ into a functional commit.
 
 Read `AGENTS.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.md`,
 `docs/APPLICATION_PLATFORM.md`, `docs/COMPILER.md`, this file,
-`docs/ROADMAP.md`, and `docs/GIGAKERNEL.md` completely. Then inspect recent
+`docs/ROADMAP.md`, and `docs/gigakernel.md` completely. Then inspect recent
 history for the affected
 subsystem. README gives repository-wide rules; ARCHITECTURE gives stable
 direction; SECURITY gives normative boundaries; APPLICATION_PLATFORM gives the
 native/VM/browser/GUI/AI contract; COMPILER gives the future-Rust compatibility,
 analysis, profile, and oracle direction; ROADMAP gives dependency order;
-GIGAKERNEL.md is the detailed dated evidence ledger. Source and tests decide
-whether a stated item actually exists.
+The [Gigakernel guide](gigakernel.md) summarizes current evidence and links to
+the full dated ledger. Source and tests decide whether a stated item actually exists.
 
 If documents disagree, prefer in this order for factual implementation status:
 
