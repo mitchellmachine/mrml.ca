@@ -1529,11 +1529,12 @@ global accessibility input. See [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
 ## Planned system services
 
-Adaptive application/service placement is one policy over the existing process,
-service, capability, interface, and VMM mechanisms. Its canonical model is
-[ISOLATION_PLACEMENT.md](ISOLATION_PLACEMENT.md); it is **PLANNED** and must not
-become a second sandbox architecture. First-party disk/image and optical services
-follow [storage/STORAGE_AND_OPTICAL.md](storage/STORAGE_AND_OPTICAL.md).
+Strict Total MicroVM is the only MRML operating mode. Ordinary applications and
+services must run in admitted microVMs, with no native fallback. Full system
+admission and placement are **PLANNED**; the canonical model in
+[ISOLATION_PLACEMENT.md](ISOLATION_PLACEMENT.md) uses the same capability,
+interface, and VMM mechanisms, not a second sandbox. First-party disk/image and
+optical services follow [storage/STORAGE_AND_OPTICAL.md](storage/STORAGE_AND_OPTICAL.md).
 
 The existing semantic system monitor is the single **PLANNED** observer for
 authorized task, resource, integrity, device, platform-security, and recovery

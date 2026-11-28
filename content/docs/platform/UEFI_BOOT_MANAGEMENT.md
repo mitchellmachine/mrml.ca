@@ -35,6 +35,75 @@ again. This tests firmware handoff, framebuffer and the service on one machine,
 not MRML USB drive access, installation, or a physical storage driver. The
 internal system disk is not a target.
 
+### Dragonair desktop scanout check
+
+Use the device-free persistent-desktop image for a display-only check. It
+boots one signed desktop microVM and uses a synthetic `echo ready` command.
+The boot compositor tiles the panels at the active framebuffer resolution
+and keeps controls and glyphs compact. This does not set the video mode or
+confirm EDID matching. Do not use the KVM-only keyboard image on hardware.
+
+```text
+mrml usb image-vmx-desktop-persistent mrml-dragonair-desktop-display.img
+mrml usb test-vmx-desktop-persistent mrml-dragonair-desktop-display.img OVMF_CODE OVMF_VARS QEMU
+```
+
+On 2026-11-28 UTC, the original unscaled image built from
+[`ec1bd7c71f3b5f2d749ba0af17e4d404da5e7ca7`](https://github.com/mitchellmachine/mrml/commit/ec1bd7c71f3b5f2d749ba0af17e4d404da5e7ca7)
+refused to enter VMX under QEMU TCG and passed under nested KVM. The VGA
+capture was 1024 × 768; all 8,400 tile pixels and the checked border matched
+the reference. Testing used copies and did not modify the candidate.
+SHA-256 of that exact image:
+`76de0ccb55fd95ea56aeceb741f0a4cd4d031e0c598138f399f96a2a28206e9b`.
+A rebuild uses fresh diagnostic signing keys and produces a different hash;
+preflight the exact file to be written.
+
+Use the same dedicated expendable stick and one-time boot procedure above.
+Record the firmware version, current Secure Boot state and a photo of the
+screen. In the current image, look for a full-width workspace bar, `READY`
+in `CLISHELL`, and (when there is room for the input pane) `11` under `KEYS`.
+No key presses are required. The earlier images showed `>A` and `1` as a
+small upper-left tile or a scaled centered preview. A lingering `VMX`
+startup label, blank screen, or `NOT PASSED` is not a pass. The diagnostic
+halts after the result. Power off, remove the stick and boot the existing OS.
+No physical input, USB writes by MRML, or live desktop are expected.
+Mitchell photographed the original unscaled image on the Dragonair showing
+`>A` and `1` under `KEYS`. The photo confirms desktop scanout on that machine,
+not the selected GOP mode, EDID match, or the newer scaling path.
+The scaled follow-up passed the same QEMU test at 1024 × 768, with a
+centered 960 × 560 preview. Mitchell then photographed the centered preview
+with the expected echo and count on the Chromebook. This is evidence for
+physical scaling, but the active mode and EDID match are still unknown. Host unit tests cover the fit geometry for
+1080p, 4K, portrait, and undersized framebuffers.
+
+
+### Read-only Chromebook keyboard inventory
+
+Before choosing a physical keyboard transport, inspect the ACPI controller
+advertisement without accessing any controller registers:
+
+```text
+mrml usb image-i8042-inventory mrml-i8042-inventory.img
+mrml usb test-i8042-inventory mrml-i8042-inventory.img OVMF_CODE OVMF_VARS QEMU
+```
+
+The opt-in UEFI image checks the unique, checksummed [ACPI FADT](https://uefi.org/specs/ACPI/6.6/05_ACPI_Software_Programming_Model.html#fixed-acpi-description-table-fadt)
+on the firmware memory map. A valid, non-hardware-reduced FADT with the 8042 bit set shows
+`I8042 ADVERTISED`. A clear bit or hardware-reduced configuration shows
+`I8042 NOT ADVERTISED`; missing, old, ambiguous or malformed data shows
+`I8042 UNVERIFIED`. These are observations only: even a positive result
+does not prove the built-in keyboard is wired to the controller, establish
+exclusive ownership, or enable keyboard input. The image does not read
+or write any keyboard port and halts after reporting; it never launches
+the test kernel. QEMU checks the advertised and no-controller cases with the
+same image; parser tests cover invalid tables independently. Follow the same
+one-time boot and Secure Boot precautions as for the display check.
+
+The Dragonair boot of the inventory image from `4bb41f25` showed
+`I8042 NOT ADVERTISED`. Do not infer that the laptop physically lacks a
+legacy controller. Leave its raw ports untouched and use external USB HID
+as the next functional input candidate.
+
 ### Future Chromebook USB write check
 
 The target is a separate expendable USB data stick with a preallocated
@@ -259,6 +328,101 @@ The 2026-11-27 read-only follow-up (`87b78e16`, `XHCI87B.EFI`) confirmed
 buffers before the pointer array and other DMA objects. The controller was
 still firmware-owned and shared with the USB boot source. The diagnostic
 reported zero incomplete controllers and returned to EFI Shell without handoff.
+The inventory now compares the current shared-boot observation with those
+recorded values in one `xhci Dragonair reference:` line. Missing or changed
+identity, BAR, geometry, ownership, MCFG coverage, or DMAR route cannot match.
+The comparison runs before firmware exit and performs no extra device reads;
+a match is not verification of board identity or permission to access hardware.
+Any change is a reason to record the full output, not to attempt a handoff.
+For the exact shared boot controller the inventory also reports `xhci passive
+PCI plan:`. It uses the same pre-exit `GetMemoryMap` snapshot as its ACPI read,
+normalized without a framebuffer overlay or an emulator exception. Only
+explicit non-runtime memory-mapped I/O coverage counts. A validated DMAR
+route, no overlapping resource, and an exact MCFG page are required. Even
+`candidate only` is not a final map, live mapping, or hardware authorization.
+The application continues to return to the EFI Shell without touching ECAM.
+On Dragonair, `XHCIMAP.EFI` from `79de697a` matched the earlier controller
+inventory but could not prove firmware coverage. The follow-up reports the
+half-open ECAM, DRHD and BAR0 ranges individually, separating missing,
+partial, and non-MMIO coverage from overlapping ACPI resources. BAR0 coverage
+is informational; the probe still does not map or access ECAM.
+The Dragonair range report from `53cfd270` showed no descriptor for the full
+ECAM window, exact PCI page, either remapper bootstrap page, or BAR0. The
+follow-up reads the firmware's separate DXE resource classification for the
+selected ECAM window, exact PCI page, and DRHD pages before leaving firmware.
+It uses only [PI GetMemorySpaceDescriptor](https://uefi.org/specs/PI/1.8/V2_Services_DXE_Services.html),
+checks the function's location in boot-services code, and reports whether
+firmware classifies the range as MMIO capable of uncacheable access. This
+is not a cache-policy measurement or a substitute for explicit UEFI coverage.
+Dragonair then reported positive DXE classification for the full ECAM window,
+the exact PCI page and both remappers; all remained absent from `GetMemoryMap`.
+The follow-up model binds positive DXE observations to the requester, selected
+ECAM window, BAR, and routed remapper layout. It separately checks a later
+normalized map for incompatible or partial intersections. An absent range
+can be non-conflicting without proving coverage. These checks return no
+mapping and do not change the production or physical diagnostic policy.
+A fixed 200-byte version-one diagnostic record can carry the scalar layout
+without retaining firmware pointers or indexing from record-supplied counts.
+Validation compares the entire copy with an independent reconstruction before
+checking the final map. The standalone inventory also attempts this copy
+from genuine firmware classifications and reports refusal or agreement with
+its pre-exit snapshot. It returns to firmware either way; this does not run
+`ExitBootServices` and is not wired into the live boot handoff. Canonical
+equality does not authenticate origin. A bounded optional handoff slot now
+models explicit incomplete status or a copied record bound to the checked
+USB requester and BAR. It requires the ACPI pair and USB observation and
+rejects partial, orphaned or mixed payloads before yielding memory regions.
+In Q35 fixture profile 9, the signed loader uses the firmware query on the
+exact emulated resources and transports incomplete status or a complete
+copy across firmware exit. The kernel independently reconstructs the layout
+from the checked ACPI pair and USB record and tests the final map for
+conflicts. A bounded walk of the active CPU page tables also checks that
+no virtual alias or table frame points into the emulated ECAM window, DRHD
+bootstrap page, or full USB BAR. This is a structural CPU check, not a
+measurement of stale translations or DMA state. The fixture stops without
+device mappings or host release regardless of
+the verdict. Installed OVMF has exercised only the live incomplete case;
+complete and conflicting copies are covered by synthetic data-only tests.
+
+The [Linux PCI/ACPI notes](https://docs.kernel.org/PCI/acpi-info.html) explain
+why a missing EFI map descriptor does not by itself diagnose a firmware bug:
+the ECAM reservation belongs in an ACPI motherboard resource. The
+[MrChromebox coreboot source](https://github.com/MrChromebox/coreboot/blob/master/src/acpi/dsdt_top.asl#L62)
+can expose it through `PNP0C02` (when configured), but the installed
+Dragonair DSDT has not been verified. Compare an exact firmware dump with the
+MCFG interval before treating it as corroboration. This does not account for
+the remapper, BAR, effective cache policy, DMA, or handoff authority.
+For a future passive post-exit diagnostic, the planner derives one 4 KiB PCI
+configuration page from the exact MCFG segment, bus, device and function. It
+requires explicit coverage by a normalized firmware MMIO range and rejects
+collision with the retained controller BAR. The header sampler requires two
+matching identity, command, header and BAR samples and refuses an unexpected
+requester or a different retained BAR allocation before reading. These steps
+have model coverage only; no physical ECAM mapping is installed. A matching BAR base does not validate its extent,
+prove DMA isolation, or permit a handoff.
+The page-table verifier now also binds this plan to the diagnostic's prepared
+root and exact one-page supervisor read-only, non-executable device mapping.
+A second mapping of that physical page, even if also read-only, is rejected.
+This checks page-table structure only; the live diagnostic must still prove
+firmware exit, retire stale translations, and check CPU cache policy before
+sampling. No live physical read is wired to this verifier. The sealed Q35
+regression runs the same structure check on its fixed emulated endpoint
+before the host release. It logs separate results for a verified read-only
+leaf and a writable endpoint rejected by the passive path. The writable
+shutdown fixtures still have their own independent checks and release. The
+read-only Q35 fixture uses the same bounded double sampler as the retained
+boot record check. A changed identity, command, header type or BAR stops the
+sample before any remapper, bridge or controller register read. QMP checks the
+emulated device independently. This is not a physical ECAM test.
+The boot handoff codec can carry one optional, canonical 40-byte version-1
+USB observation after the validated DMAR and MCFG pair. It rejects malformed
+or duplicate records and records without the table pair. The record grants no
+access. Only sealed Q35 profile 8 emits a record, taken from the actual
+firmware USB boot path immediately before exit. A separate boot source stops
+without releasing the diagnostic. The kernel requires the exact isolated
+endpoint record and corroborates the BAR against the live read-only sample.
+QMP independently checks the emulated device and attached boot media.
+Normal boot emits no record and no physical hardware is tested.
 
 The signed QEMU/OVMF negative control boots the same sealed test release
 from a read-only virtual disk attached directly to the sole xHCI candidate.
@@ -299,12 +463,87 @@ Enable, restores the PCI configuration address, and pauses for independent
 QEMU readback. The host detaches the virtual boot disk and supplies the
 release through the test UART; it does not write PCI configuration in
 the guest case. A denied release writes no command and stops. The allow
-case continues from RAM only after the host verifies the exact change.
+case continues from RAM only after the host verifies the exact change and
+rechecks that the emulated boot source is detached and the controller bus
+is empty. The guest then reads back the exact bus-master-disabled PCI
+command before leaving the test checkpoint. This does not prove VT-d
+containment or ownership transfer on physical hardware. A separate negative
+case on that same emulated boot controller sends the continue byte after
+retirement and bus-master shutdown, with VT-d translation independently
+observed off. The loader records the missing-proof rejection and halts.
+The cold regression below tests the positive VT-d result without granting
+any USB access to the normal boot path.
 This diagnostic is not in the normal boot profile and does not claim
 legacy semaphore transfer or enable DMA. An independent software model
 checks the retained lease, blocked DMA, quiescent boot source, and exact
 capability again at the OS-semaphore write boundary. If any changed since
-observation, it records no write. This is not a real firmware handshake.
+observation, it records no write. After a request, losing DMA containment
+while polling or observing a changed lease or owner at the final acceptance
+check prevents transfer; the model never retries the write. This is not a
+real firmware handshake. The bounded ownership-sequence validator is Rust
+library code shared with the model. Its result is not an authorization to
+write registers, enable DMA, or reset the controller. The VT-d table layer
+can also verify that an exact requester has an empty context before and
+after a completed read/write drain on the active legacy root. It requires
+an ordered writeback of the exact root and context entries on noncoherent
+hardware.
+Register-model tests reject an occupied context, a different root, and an
+incomplete drain. The sealed cold QEMU diagnostic checks that an occupied
+context is refused, then verifies denial after withdrawing the leaf and
+clearing the exact context with both bus-master bits off. The host checks
+the resulting context page independently. A separate no-marker case also
+boots from a read-only disk attached directly to that same isolated
+`0000:41:00.0` requester, with no second boot controller. QEMU verifies
+firmware reads without writes and the loader refuses to release the fixture.
+The combined marked case checks both on the same requester: after the
+kernel reaches the post-firmware checkpoint, the host proves the disk was
+read without writes, detaches it, and rechecks the exact PCI controller and
+empty USB bus. The dedicated emulator release permits only an expected
+xHCI port-change event on an otherwise halted controller. The signed guest
+clears both bus-master bits, verifies VT-d denial after the drain, and the
+host independently checks the denied context and the empty USB bus again.
+This neither transfers physical firmware ownership nor authorizes hardware
+handoff in the normal boot path. An independent read-only control case
+passes through the same post-firmware checkpoint but leaves the boot disk
+attached. The guest uses only read-only MMIO mappings. The paused host
+checks attachment, zero media writes, unchanged PCI and xHCI state, and
+inactive VT-d before and after the guest report. It records boot-source
+retirement, DMA containment, and firmware ownership transfer as unproved.
+Reaching the kernel alone is not evidence for any of those conditions.
+The read-only inventory library also has a correlation helper for the next
+physical diagnostic. It compares the USB boot requester, PCI identity and
+revision, enabled memory decoding, and the independently observed exact BAR
+range across firmware exit. It reports the bus-master bit without conferring
+access or inferring ownership, retirement, or DMA containment. It does not
+read hardware. The standalone EFI inventory now emits a pointer-free boot
+evidence record only for the exact USB boot controller and its firmware-
+validated BAR0. The QEMU test includes a second xHCI controller and checks
+that it does not claim the evidence record. The inventory still returns to
+firmware without granting access. The diagnostic library can also encode
+these fields as one 40-byte little-endian V1 record (`MRMLXHCI`). Decoding
+requires the exact version, size, zero reserved bytes, the independently
+identified PCI function, and an aligned nonoverflowing BAR span. Decoding
+untrusted bytes never proves provenance or safe read coverage. The EFI
+inventory prints the encoded bytes as two numbered, bounded hex lines;
+QEMU checks the exact contents and associates them with only the actual
+USB boot controller. The read-only firmware PCI adapter is shared as a
+separate module and keeps all protocol pointers on the firmware side. That
+lets the opt-in loader reuse the same capture code without duplicating the
+PCI ABI or retaining a firmware interface after exit. The marked QEMU
+loader copies the exact record across a successful ExitBootServices,
+checks its diagnostic identity and emits only those bytes. The paused
+host independently verifies the same requester, BAR, and retained boot
+source, before and after reading the trace. The guest never reads the
+controller after exit in this case, and receives no ownership or write
+authority. Two additional marked cases use either the wrong release byte
+or a real read-only boot disk on a different controller. Both yield an
+exact rejection trace with no record bytes, with the boot disk still
+attached and the observed controller unchanged. A separate marked comparison
+case reads only the exact PCI function's identity, command and BAR base
+after exit, then restores the PCI configuration selector. It never reads
+the BAR as MMIO. QEMU independently checks the configuration, BAR length,
+and restored selector. A match is still not evidence of firmware ownership
+transfer, disk retirement, DMA denial, or permission to write.
 
 ### Diagnose a return to firmware
 

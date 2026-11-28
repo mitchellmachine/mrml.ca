@@ -355,9 +355,9 @@ Fresh one-time-signed artifacts completed this controlled hosted probe on
 `native_fallback=0`, then reached the expected bounded halt. WHP completed the
 same exact-generation ZIM/Zstd exchange and lifecycle cleanup. This is hosted
 controlled-probe evidence only; it does not prove host-resistant isolation,
-physical hardware, persistent owner settings, boot-menu Total mode, or
-required-system Total readiness. The complete adaptive-placement architecture
-and Total MicroVM Isolation therefore remain **PLANNED**.
+physical hardware, persistent owner settings, normal MRML boot, or
+required-system Total readiness. Full-system Total MicroVM admission therefore
+remains **PLANNED**.
 
 The component profile now also creates its complete fixed-capacity task runtime
 and service supervisor through the existing quantitative `MemoryPool` wrappers.

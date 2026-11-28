@@ -185,15 +185,15 @@ and verification state. Neither path may make sight, pointer use, cloud AI, or a
 working accelerated GPU a prerequisite for essential install/recovery choices.
 Disk/image, optical media, burn progress, and destructive previews use the same
 semantic objects described in
-[storage/STORAGE_AND_OPTICAL.md](storage/STORAGE_AND_OPTICAL.md). Adaptive
-isolation settings and the boot-time total-microVM choice likewise require
-equivalent visual, keyboard, Braille, speech, and trusted nonvisual meaning; see
+[storage/STORAGE_AND_OPTICAL.md](storage/STORAGE_AND_OPTICAL.md). The pre-OS
+boot menu's documented text/keyboard baseline applies to selecting `MRML` or
+`MRML Recovery`. `MRML` always means strict Total MicroVM; there is no isolation
+mode picker. In the admitted runtime, isolation status and required-component
+failures must have equivalent meaning across visual, keyboard, Braille, speech,
+and trusted nonvisual interfaces. A failed accessibility bridge or projected
+input/speech route is a high-priority component failure, not permission to
+launch an eligible application natively. See
 [ISOLATION_PLACEMENT.md](ISOLATION_PLACEMENT.md).
-An accessibility bridge or projected input/speech failure in strict Total mode
-is a high-priority component/feature failure, not permission to launch the
-eligible application natively. Pre-OS selection guarantees only the boot menu's
-documented text/keyboard baseline; full semantic accessibility begins with the
-admitted runtime stack.
 
 Application VMs project authenticated, bounded guest GUI semantics into the
 host graph. Guest semantics are untrusted content and cannot forge compositor-

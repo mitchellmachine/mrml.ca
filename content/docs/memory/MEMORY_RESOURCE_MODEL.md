@@ -247,7 +247,7 @@ resource exhaustion makes the affected eligible component unavailable and
 reports the exact shortage; it never causes native fallback. Resource pressure
 may reduce availability, throttle, or stop work, but cannot weaken placement.
 
-The adaptive-isolation path now has a **PARTIALLY IMPLEMENTED** linear
+The isolation-admission path now has a **PARTIALLY IMPLEMENTED** linear
 `MicrovmProjectionPlan`. Before backend allocation begins it revalidates the
 exact guest-RAM object capability and backing kind, exact RAM page count, and a
 live same-domain vCPU reservation inspected through its parent budget

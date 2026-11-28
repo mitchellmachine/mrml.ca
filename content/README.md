@@ -1,11 +1,30 @@
 # MRML
 
 MRML (the **Mitchell Renouf Machine Learning Library**) is a research project
-building an operating system, compiler, and machine-learning libraries in
-original Rust without third-party code dependencies. It is AI-led and
+building an agentic operating system, compiler, and machine-learning libraries
+in original Rust without third-party code dependencies. It is AI-led and
 human-directed, with an emphasis on owner control, accessibility, and a small
-trusted code base. The project is dedicated to the public domain under
-[CC0](LICENSE).
+trusted code base.
+
+MRML is a public-benefit project. We dedicate it to the public domain under
+[CC0](LICENSE) to help people use computers securely and to build software
+that treats disabled people with dignity as first-class users.
+
+## Support MRML
+
+Donations are welcome. They would help speed up development and fund our
+goal of running daily defensive security scans with OpenAI Daybreak. We
+estimate daily scanning would cost MRML **$300 USD per month**, separate
+from the development subscription.
+
+The maintainer currently pays **$200 USD per month** for ChatGPT Pro 200
+(previously called Pro 20X) for development. With enough support, MRML could
+upgrade to [Pro 500](https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers),
+which costs **$500 USD per month** and includes a larger Work and Codex
+allowance.
+
+If you'd like to donate, contact [mitchellrenouf@mrml.ca](mailto:mitchellrenouf@mrml.ca).
+MRML remains dedicated to the public domain under CC0.
 
 ## The Gigakernel and Total MicroVM isolation
 
@@ -31,6 +50,12 @@ The name makes no claim of
 architectural priority or formal verification. See the
 [architecture comparison](docs/gigakernel.md#how-the-gigakernel-compares)
 and [placement rules](docs/ISOLATION_PLACEMENT.md).
+
+### Architecture snapshot
+
+![MRML Gigakernel architecture: signed desktop microVM scanout verified in QEMU, separate controller and input service routes, and pending Chromebook checks](docs/images/gigakernel-2026-11-28-desktop.svg)
+
+**2026-11-28 UTC · source commit [ec1bd7c71f3b5f2d749ba0af17e4d404da5e7ca7](https://github.com/mitchellmachine/mrml/commit/ec1bd7c71f3b5f2d749ba0af17e4d404da5e7ca7).** QEMU verified a signed desktop microVM's terminal echo on emulated VGA, including a separate test with emulated keyboard events. The [Chromebook candidate](docs/platform/UEFI_BOOT_MANAGEMENT.md#dragonair-desktop-scanout-check) uses synthetic input and has not run on the Chromebook. The two xHCI admission routes, five input decoders, and emulated USB write are separate checks; none proves physical input or storage.
 
 ## Software for Windows and Linux
 

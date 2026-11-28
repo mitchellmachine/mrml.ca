@@ -6,6 +6,77 @@ If isolation or a required resource is unavailable, the workload does not
 start. There is no native fallback inside MRML OS. The Windows and Linux
 host tools are separate programs, not an alternate execution mode.
 
+## Hardware discovery and driver supervision
+
+The hardware supervisor is a service, not part of the privileged kernel.
+It consumes a complete, generation-tagged PCI inventory from a trusted
+platform provider. For each xHCI controller it requests a separate driver
+microVM, keyed by PCI segment, bus, device, function, and controller
+incarnation. USB peripherals remain beneath their controller's driver;
+drivers are not shared across controllers. A failed driver launch has no
+native fallback. Removal or replacement stops routing and retires that
+controller's VM before reusing its address. Unrelated controllers stay put.
+
+An opt-in QEMU fixture enumerates two real emulated xHCI functions and
+checks that each produces one distinct launch request. A second scan
+retains both. It records requests and does not launch driver guests.
+A separate admission adapter now matches each request against an
+independently supplied controller binding and live control capability,
+rejects descriptor or incarnation changes, and prepares only a distinct
+Total MicroVM route in the existing kernel table. It grants no device
+mapping and starts no guest. The QEMU test verifies both requests prepare
+separate domains against a fixed test catalog. A separate hosted KVM lifecycle fixture uses synthetic controller
+snapshots and the same admission adapter to run two distinct signed,
+device-free diagnostic guests. It verifies that retiring one withdraws
+its route without stopping the other, and that a failed constructor
+publishes no running guest. This is not an xHCI driver guest or a combined
+QEMU-to-KVM device test. Production inventory transport and
+the platform adapter that binds each launch to independently admitted
+controller, interrupt, and DMA capabilities are not wired yet. Inventory
+data itself never grants those capabilities.
+
+## Input driver services
+
+Input decoding is split into five microVM-only service components: PS/2
+keyboard, PS/2 mouse, USB keyboard, USB mouse, and USB tablet. A shared
+i8042 broker must own the PS/2 ports and route keyboard and auxiliary
+bytes separately. The broker's tested routing core separates command
+replies from input, bounds work and queues, and quarantines an affected
+stream after loss until the owner re-establishes its input boundary. It
+contains no production port reads. The opt-in Linux QEMU test runs a
+private emulator and verifies that its actual i8042 output reaches
+only the corresponding keyboard or mouse decoder. Neither decoder
+runs in a guest in that test. Each USB controller keeps its own driver microVM and
+will route just the admitted HID interface reports to the input service.
+Input services do not receive raw I/O ports, controller mappings, or DMA
+access. This keeps a USB mouse and keyboard separate even if they share
+one controller or are part of one composite device.
+
+The PS/2 cores cover scan set 2 and standard three-byte mouse packets.
+USB keyboard and mouse cover HID boot protocol; the tablet covers the
+bounded QEMU-style absolute pointer profile, not pen pressure or touch.
+The decoder cores have host test coverage. Live controller transports,
+guest entry points, and routing into the Semantic Scene Graph are not yet
+wired. Device reports cannot directly interact with a trusted prompt;
+the existing [accessibility and authority rules](ACCESSIBILITY.md) apply.
+
+## Boot display and compositor service
+
+UEFI GOP mode selection stays in the loader: GOP is a firmware boot
+protocol, not a runtime display service. After boot, the compositor
+microVM renders into private memory. A trusted output owner must authorize
+presentation separately; the guest receives no physical framebuffer
+address, firmware interface, or raw device mapping. The compositor has no
+direct native-paint entry point.
+
+The signed hosted compositor probe already proves a private raster capture.
+Hosted projection tests now take a captured frame from a live admitted
+route and copy it into a bounded output, including different source and
+output strides and RGB/BGR ordering. The copy preserves pixels outside
+its rectangle and refuses retired routes, unauthorized or replaced outputs,
+and incompatible geometry. Normal boot still does not launch a compositor
+or present its frame on real hardware. See [the reported fixture scope](ISOLATION_PLACEMENT.md).
+
 ## How the Gigakernel compares
 
 Gigakernel, named after Gigachad, is MRML's name for its experimental
@@ -53,8 +124,21 @@ service microVMs.
 
 ## Current work
 
-1. Complete normal boot into admitted services and connect authenticated
-   recovery, launch, and service retirement end to end.
+The kernel PE has a separate `normal_boot` build profile. It uses the same
+bounded loader-handoff validation as the bring-up builds, checks the release
+boot policy on the bootstrap CPU, and then parks without launching anything.
+This profile rejects diagnostic features at compile time. The existing
+default and opt-in probe builds are unchanged in purpose; they are not
+alternate operating modes. Selecting `normal_boot` builds a kernel PE, not a
+complete boot image or a working installed system. In the Windows-hosted
+x86-64 release build, the PE's executable section was 26,765 virtual bytes
+and its writable data section was 8,192 virtual bytes. The diagnostic build
+still owns its secondary-CPU descriptor arena. These are section sizes for
+this bootstrap, not a full-runtime or trusted-code-base measurement.
+
+1. Connect authenticated recovery to the first admitted supervisor microVM
+   on the normal boot path. Verify launch and clean retirement of one real
+   service before moving supervision policy out of the kernel.
 2. Qualify USB controller handoff with firmware I/O closed and DMA blocked
    across the transition. Verify scratchpad retirement and controller
    isolation before running a physical read or a single authorized write

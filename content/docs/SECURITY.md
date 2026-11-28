@@ -96,7 +96,7 @@ or remote attestation.
 
 ## Capability and isolation invariants
 
-The planned adaptive placement policy is specified in
+The strict Total MicroVM admission policy is specified in
 [ISOLATION_PLACEMENT.md](ISOLATION_PLACEMENT.md). Placement metadata never grants
 authority, mandatory floors fail closed, and microVM capabilities are separately
 projected and revocable.

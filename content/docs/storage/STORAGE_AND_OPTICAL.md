@@ -2898,11 +2898,20 @@ the fault for later operations. This covers removal between requests, not
 mid-transfer removal, recovery, hardware speed, power-loss durability, or
 certification.
 
-Run the opt-in fixture on Linux with QEMU installed from the repository root:
+The tests are owned by separate service packages. The USB storage service
+checks sector read/write/flush and transport behavior; the FAT32 service
+checks provisioned metadata, stale contents, and exact file updates. They
+share an emulated disk harness that checks unplug, authority withdrawal,
+and the entire persisted disk. These are hosted tests, not a new live USB
+storage guest or a normal-boot service route.
+
+Run both opt-in suites on Linux with QEMU installed from the repository root:
 
 ```bash
-./target/debug/mrml test org.mrml.test.usb-fat32-qtest --target linux
-./target/mrml-native/linux/debug/mrml_usb_fat32_qtest_tests --ignored
+./target/debug/mrml test org.mrml.service.usb-storage --target linux
+./target/debug/mrml test org.mrml.service.fat32 --target linux
+./target/mrml-native/linux/debug/mrml_usb_storage_service_tests --ignored
+./target/mrml-native/linux/debug/mrml_fat32_service_contract_tests --ignored
 ```
 
 The partition bounds and exclusivity in this test are supplied by its private

@@ -190,7 +190,7 @@ and restore native state before the slices reconcile independently and the
 reservation is released. Fresh release probes measured 6,519/3,593 microseconds
 on WHP and 4,601/4,229 microseconds on nested KVM. This remains hosted evidence,
 not trusted CPU time, physical topology, general scheduling, or multi-vCPU
-adaptive component admission.
+generation-bound component admission.
 
 The focused signed ZIM/Zstd component profile now consumes one exact
 domain-bound vCPU reservation before either hosted backend constructs its

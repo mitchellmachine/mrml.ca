@@ -309,6 +309,103 @@ Automation uses the same logical space and identifies every spatial reference
 with the appropriate display, window, surface, and object identities. Changing
 DPI must not invalidate semantic automation.
 
+## Desktop input prototype
+
+The `org.mrml.service.desktop` core uses one bounded semantic snapshot for
+focus, rendering and hit-testing. It provides three numbered workspaces, a
+single tiled keyboard-test terminal, a touch-sized launcher, and a cursor
+that appears on mouse attachment and disappears on detachment. Touch taps
+activate the same semantic controls as keyboard and mouse; touch never
+creates a mouse cursor. A persistent diagnostics tile reports attachment,
+input event and delivered-key counts, terminal state, and launch failures.
+It does not record text or claim hardware checks. Use Super+Enter to request the dummy app, Tab to
+cycle focus, and activate the focused control. The terminal app only echoes
+text, handles Backspace and Enter, and retains at most six short lines.
+It cannot run commands.
+
+The host-only `mrml-desktop-preview` binary emits a [static SVG preview](images/desktop-preview.svg)
+from the same semantic layout. Desktop and dummy app builds contain no discovery,
+raw input, display mapping or native MRML fallback. A trusted launcher must
+admit the exact terminal guest, route normalized seat events, and authorize
+compositor presentation. Tests exercise keyboard, mouse and touch events
+with a fixture. An opt-in QEMU test also feeds emulated PS/2 keyboard
+and mouse reports through the i8042 broker into the hosted desktop and
+checks the echo, pointer position and diagnostic counts. Normal boot,
+physical touchscreen input, and a full
+cross-VM Semantic Scene Graph transport are not yet connected. A signed KVM
+diagnostic image exercises the desktop state machine and its same-guest echo
+fixture via a bounded synthetic input mailbox. The host verifies diagnostic
+state and mailbox withdrawal. It also captures a guest-rendered 120×70
+layout thumbnail and projects it through the compositor to a disposable
+memory output. The thumbnail includes tile labels, a small terminal echo
+and a diagnostic key count. The fixture verifies those pixels, not hardware
+scanout or an independently launched terminal app. The diagnostic bitmap font
+is restricted and substitutes a question mark for unsupported glyphs.
+The separate `mrml usb test-display OVMF_CODE OVMF_VARS QEMU` command checks
+real emulated VGA output after the signed FAT32 boot diagnostic. It compares
+the visible PASS glyph pixels independently of the serial boot trace. This
+qualifies the emulator's screen evidence path, not desktop presentation.
+The guest can now return its entire thumbnail in one fixed 4 KiB mailbox.
+The compositor fixture checks that this packed frame exactly matches the
+row-wise capture before projecting it. The format passes pixels only and
+grants no device or display access.
+
+The separate, opt-in VMX desktop boot diagnostic is built with
+`mrml usb image-vmx-desktop DESKTOP.img` and checked with
+`mrml usb test-vmx-desktop DESKTOP.img OVMF_CODE OVMF_VARS QEMU`.
+The signed desktop microVM returns bounded panel state and shell text through
+a separate, non-executable reply page. The boot compositor validates the
+packet, exact admission and output capability before painting at the active
+framebuffer resolution. Workspace tabs and the status bar span the display;
+open panels tile the remaining area. Text and gaps use a modest, bounded
+resolution-based scale, and narrow layouts omit the secondary panel. This
+doesn't set firmware video modes or measure physical DPI. The guest never
+gets access to the framebuffer and the renderer is still part of the trusted
+boot broker, not an independently launched compositor.
+
+The optional `image-vmx-desktop-input` image sends synthetic Enter to open
+the terminal. The `image-vmx-desktop-persistent` image keeps the same
+VMCS/EPT and guest stack across two yields and submits a synthetic
+`echo ready` to the guest-private `clishell`. The shell parses only the
+`echo` built-in and treats its argument as literal text; unknown commands
+are rejected. There is no external process launch, redirection, disk or
+network access. None of these profiles reads a hardware keyboard.
+
+The `image-vmx-desktop-keyboard` profile shows the idle desktop and opens
+the terminal on a virtual Enter. It redraws after each complete key
+make/release pair from the emulator. Up to 32 events are supported,
+including letters, Space, Backspace and Enter to submit. Escape, a time
+limit or unsupported traffic ends the session without forwarding
+unsupported input. `test-vmx-desktop-keyboard` verifies VGA captures of
+idle, terminal-open, the draft of `echo hi`, its separate command output
+and the final screen. The nested-KVM-only transport sends no controller
+commands and gives the guest no keyboard ports. There is no physical input,
+mouse support or general keymap in this boot profile.
+
+The external USB boot-keyboard decoder now tracks validated report edges.
+It waits for an all-released report after attach, a gap, or a malformed
+report and suppresses repeated reports and unordered ordinary-key chords.
+The first function profile accepts one low/full-speed, default-alternate
+boot keyboard with a HID descriptor and one interrupt-IN endpoint. It
+refuses ambiguous interfaces or aliased active endpoints and starts report
+decoding only after the owning transport reports successful HID `SET_PROTOCOL`
+for the selected interface. A hosted desktop test starts from a configuration
+descriptor, checks the control request, routes typed events into the focused
+`clishell`, and checks the submitted `echo hi` output. The USB controller transport,
+interface ownership and isolated report delivery are not part of that
+test; external keyboard support on physical hardware remains unverified.
+
+### MicroVM task manager prototype
+
+The desktop exposes a separate task-manager view for supervisor-projected VM
+status. The prototype distinguishes starting, running, stopping, stopped,
+and quarantined instances. Listing and control use different capabilities.
+Stop and Restart target the exact displayed instance generation. Restart
+requires verified teardown and a newer instance; critical or quarantined
+guests cannot be stopped or restarted from this view. The static preview
+does not have a live supervisor, so its actions are disabled. Normal-boot
+supervisor integration remains open.
+
 ## MRML Semantic Scene Graph
 
 The GUI is never only pixels. Every native GUI maintains synchronized visual

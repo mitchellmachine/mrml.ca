@@ -25,11 +25,12 @@ remains the only MRML OS mode.
 
 The current USB gate is native controller qualification. Signed KVM guests
 have already written, flushed, and independently verified the exact fixture
-change on both emulated USB speeds at `40554703`. Next, qualify the controller's
-scratchpad/page-size requirements, firmware handoff, and VMX/VT-d assignment
-and teardown. Keep the planned physical write target separate and expendable.
-The Chromebook inventory identifies a shared USB boot controller; it does not
-establish an isolated handoff or a physical write. See the
+change on both emulated USB speeds at `40554703`. The [Chromebook EFI inventory](platform/UEFI_BOOT_MANAGEMENT.md#read-only-xhci-inventory-before-native-bring-up)
+measured 34 scratchpad buffers at 4 KiB each and confirmed firmware ownership
+of the controller shared with the boot stick. Scratchpad startup, cleanup, and
+handoff refusal have software-model coverage. Next, verify firmware handoff,
+isolated VMX/VT-d assignment, and teardown on hardware. Keep the physical
+write target separate and expendable. See the
 [storage design and evidence](storage/STORAGE_AND_OPTICAL.md).
 
 ## Earlier storage and supervisor gates
@@ -1998,7 +1999,7 @@ layout before creating direct steady-state command/completion endpoints. Focused
 tests reject zero authority and capacity mismatch. This is **PARTIALLY
 IMPLEMENTED** queue-boundary evidence only; broker integration, hardware
 execution, and physical isolation remain **PLANNED** and do not displace the
-current adaptive-isolation dependency gate.
+current Total MicroVM admission dependency gate.
 
 Three new persistent deltas are documented before implementation:
 
@@ -2009,11 +2010,13 @@ Three new persistent deltas are documented before implementation:
   three-package boot release is available as `mrml release create|verify`;
   general Store release composition, `.mrz`, and `.mrsig` tooling remain
   **PLANNED**.
-- [ISOLATION_PLACEMENT.md](ISOLATION_PLACEMENT.md) defines adaptive placement,
-  mandatory floors, semantic interface compatibility across admitted forms,
-  persistent owner policy, and a strict one-boot total-microVM request. Typed
-  Manifest V2 validation and explicit current application/service native
-  policies are **IMPLEMENTED**. The
+- [ISOLATION_PLACEMENT.md](ISOLATION_PLACEMENT.md) defines strict Total MicroVM
+  as MRML's only operating mode and specifies admission floors, semantic
+  interfaces, and persistent owner policy. The rest of this entry records
+  earlier test and implementation evidence, including native diagnostic routes
+  and the legacy one-boot Total token. None are alternate MRML operating modes.
+  Typed Manifest V2 validation and diagnostic placement policies were
+  **IMPLEMENTED**. The
   resolver handles defaults, owner selection, total-mode promotion, and visible
   unsupported exceptions, and the workspace/lock retains each validated policy;
   the kernel additionally records bounded generational launch admission and
@@ -2133,7 +2136,7 @@ Three new persistent deltas are documented before implementation:
   disk/image, GPT/FAT, UDF/ISO, MMC, AHCI/USB optical, burning, and virtual-
   optical dependency order. New optical mechanisms are **PLANNED**.
 
-With the small package-extension/tooling gate complete, keep adaptive isolation
+With the small package-extension/tooling gate complete, keep Total MicroVM admission
 and storage/optical as separate sequential foundational OS tasks under
 the work-in-progress limit; do not combine them into one functional commit.
 
@@ -2141,9 +2144,9 @@ Total MicroVM milestones remain separate: policy/object schema; one
 microVM service; one microVM GUI app; monitor visibility
 (**PARTIALLY IMPLEMENTED** as a capability-scoped aggregate kernel snapshot);
 resource/device projection; Settings/shell policy; strict Total runtime;
-bootloader selector; EFI Shell selector; required-system Total readiness;
-broad application compatibility; and physical/performance evidence. A menu
-entry, policy type, UI, or one guest cannot promote Total mode. Successful
+normal boot and recovery entry; required-system Total readiness; broad
+application compatibility; and physical/performance evidence. A menu entry,
+policy type, UI, or one guest does not establish strict Total runtime readiness. Successful
 tested Total requires every running `MICROVM_ELIGIBLE` domain in a microVM, no
 active required `UNSUPPORTED_BLOCKER`, zero native fallback, and every host/
 boot/recovery exception explicitly enumerated and justified.
